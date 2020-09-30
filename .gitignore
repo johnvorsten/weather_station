@@ -1,0 +1,8 @@
+# Folders
+**/__pycache__/**
+**/bacpypes/**
+
+# Environment files
+*.env
+
+
