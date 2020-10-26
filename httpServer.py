@@ -16,35 +16,30 @@ import os
 import threading
 import json
 import zlib
-
 from collections import OrderedDict
 import configparser
-
-try:
-    from urlparse import urlparse, parse_qs
-    from SocketServer import ThreadingMixIn, TCPServer
-    from SimpleHTTPServer import SimpleHTTPRequestHandler
-except ImportError:
-    from urllib.parse import urlparse, parse_qs
-    from socketserver import ThreadingMixIn, TCPServer
-    from http.server import SimpleHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+from socketserver import ThreadingMixIn, TCPServer
+from http.server import SimpleHTTPRequestHandler, BaseHTTPRequestHandler
 
 # Third party imports
 from bacpypes.debugging import bacpypes_debugging, ModuleLogger
 from bacpypes.consolelogging import ConfigArgumentParser
-
 from bacpypes.core import run, deferred, stop
 from bacpypes.iocb import IOCB
-
 from bacpypes.pdu import Address, GlobalBroadcast
-from bacpypes.apdu import ReadPropertyRequest, WhoIsRequest
+from bacpypes.apdu import (ReadPropertyRequest, WhoIsRequest,
+                           ReadPropertyMultipleRequest, PropertyIdentifier,
+                           PropertyReference, ReadAccessSpecification,
+                           ReadPropertyMultipleACK,)
 from bacpypes.primitivedata import Unsigned, ObjectIdentifier
 from bacpypes.constructeddata import Array
-
 from bacpypes.app import BIPSimpleApplication
 from bacpypes.object import get_object_class, get_datatype
 from bacpypes.local.device import LocalDeviceObject
 
+
+# Initialization
 # some debugging
 _debug = True
 _log = ModuleLogger(globals())
@@ -53,154 +48,135 @@ _log = ModuleLogger(globals())
 HOST = 'localhost'
 PORT = int(os.getenv("PORT", 8080))
 
-# Keys
-config_path = r"C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\bacnet_client.ini"
-config = configparser.ConfigParser()
-config.read(config_path)
-assert 'bacnet_client' in config.sections()
-
 # reference a simple application
 this_application = None
 server = None
 
+# TODO
+# Cache control heder?
+# Get or post request for read property multiple?
+
 # favorite icon
 favicon = zlib.decompress(
-    b"x\x9c\xb5\x93\xcdN\xdb@\x14\x85\x07\x95\x07\xc8\x8amYv\xc9#\xe4\x11x\x04\x96}"
-    b'\x8c\x88\x1dl\xa0\x9b\xb6A\xa2)\x0bVTB\xa9"\xa5?*I\x16\xad"\x84d\x84DE\x93'
-    b"\x14;v\xc01M\xe2$\x988\xb1l\x9d\xde;v\\\x03\x89TU\xea\xb5N\xe4\xb9\x9a\xef"
-    b"\x1c\xcfO\x84X\xa0'\x95\x12\xf4\xbb,\x9e/\n\xb1$\x84xF\xa2\x16u\xc2>WzQ\xfc"
-    b"\xf7\xca\xad\xafo\x91T\xd2\x1ai\xe5\x1fx[\xf9\xf4\x01\xc57\xbb\xd8\xdf\xd8"
-    b"\x00\x8d\x11\xf9\x95\x12\xda\x9a\xc3\xae\xe5_\xbdDpk\x03\xc3\xaeT\xd0\xb3\xd0"
-    b">?\x83Z\xfd\x86Z\xa5\x84\x1fG_\xa4\xe7\x1c^\xa9W\xbfJ\xfe\xb4\xf0\x0e^\xdb"
-    b"\x88}0 \xafA\x0f\xa3+c&O\xbd\xf4\xc1\xf6\xb6d\x9d\xc6\x05\xdcVSz\xb0x\x1c\x10"
-    b"\x0fo\x02\xc7\xd0\xe7\xf1%\xe5\xf3\xc78\xdb\xf9Y\x93\x1eI\x1f\xf8>\xfa\xb5"
-    b"\x8bG<\x8dW\x0f^\x84\xd9\xee\xb5~\x8f\xe1w\xaf{\x83\x80\xb2\xbd\xe1\x10\x83"
-    b"\x88'\xa5\x12\xbcZ?9\x8e\xb3%\xd3\xeb`\xd4\xd2\xffdS\xb9\x96\x89!}W!\xfb\x9a"
-    b"\xf9t\xc4f\x8aos\x92\x9dtn\xe0\xe8Z\xcc\xc8=\xec\xf7d6\x97\xa3]\xc2Q\x1b(\xec"
-    b"d\x99_\x8dx\xd4\x15%\xce\x96\xf9\xbf\xacP\xd1:\xfc\xf1\x18\xbe\xeb\xe2\xaey"
-    b"\x89;]\xc5\xf1\xfb<\xf3\x99\xe9\x99\xefon\xa2\xdb6\xe5\x1c\xbb^\x8b}FV\x1b"
-    b"\x9es+\xb3\xbd\x81M\xeb\xd1\xe0^5\xf1\xbd|\xc4\xfca\xf2\xde\xf0w\x9cW\xabr."
-    b"\xe7\xd9\x8dFx\x0e\xa6){\x93\x8e\x85\xf1\xb5\x81\x89\xd9\x82\xa1\x9c\xc8;\xf9"
-    b"\xe0\x0cV\xb8W\xdc\xdb\x83\xa9i\xb1O@g\xa6T*\xd3=O\xeaP\xcc(^\x17\xfb\xe4\xb3"
-    b"Y\xc9\xb1\x17{N\xf7\xfbo\x8b\xf7\x97\x94\xe3;\xcd\xff)\xd2\xf2\xacy\xa0\x9b"
-    b"\xd4g=\x11B\x8bT\x8e\x94Y\x08%\x12\xe2q\x99\xd4\x7f*\x84O\xfa\r\xb5\x916R"
-)
-#%%
-"""What are the appropriate data types for sending a read request
-through the url?"""
-enumerations = \
-    { 'accessDoor':30
-    , 'accessPoint':33
-    , 'accessRights':34
-    , 'accessUser':35
-    , 'accessZone':36
-    , 'accumulator':23
-    , 'alertEnrollment':52
-    , 'analogInput':0
-    , 'analogOutput':1
-    , 'analogValue':2
-    , 'averaging':18
-    , 'binaryInput':3
-    , 'binaryOutput':4
-    , 'binaryValue':5
-    , 'bitstringValue':39
-    , 'calendar':6
-    , 'channel':53
-    , 'characterstringValue':40
-    , 'command':7
-    , 'credentialDataInput':37
-    , 'datePatternValue':41
-    , 'dateValue':42
-    , 'datetimePatternValue':43
-    , 'datetimeValue':44
-    , 'device':8
-    , 'eventEnrollment':9
-    , 'eventLog':25
-    , 'file':10
-    , 'globalGroup':26
-    , 'group':11
-    , 'integerValue':45
-    , 'largeAnalogValue':46
-    , 'lifeSafetyPoint':21
-    , 'lifeSafetyZone':22
-    , 'lightingOutput':54
-    , 'loadControl':28
-    , 'loop':12
-    , 'multiStateInput':13
-    , 'multiStateOutput':14
-    , 'multiStateValue':19
-    , 'networkSecurity':38
-    , 'notificationClass':15
-    , 'notificationForwarder':51
-    , 'octetstringValue':47
-    , 'positiveIntegerValue':48
-    , 'program':16
-    , 'pulseConverter':24
-    , 'schedule':17
-    , 'structuredView':29
-    , 'timePatternValue':49
-    , 'timeValue':50
-    , 'trendLog':20
-    , 'trendLogMultiple':27
-    , 'networkPort':56
-    }
+    b'x\x9c\xab\x983\n\x90\x00\x00\x9b,\xa5\x01'
+    )
 
 
 #%%
 #
-#   ThreadedHTTPRequestHandler
+#   HTTPRequestHandler
 #
 
 
 @bacpypes_debugging
-class ThreadedHTTPRequestHandler(SimpleHTTPRequestHandler):
+class HTTPRequestHandler(BaseHTTPRequestHandler):
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header(b"Content-Type", "text/html")
+        self.end_headers()
+        return None
+
     def do_GET(self):
         """
         Example
         http://localhost/read/adderss/analogValue:1
         http://localhost/read/<address>/<object type>:<object instance number>
-        http://localhost/whois/<address>/<object type>:<object instance number>"""
+        http://localhost/whois/<address>/<object type>:<object instance number>
+        http://localhost/read/<address>/<object type>:<object instance number>/<property>
+        Example
+        http://localhost:8081/read/192.168.1.100/analogValue:0/presentValue"""
         if _debug:
-            ThreadedHTTPRequestHandler._debug("do_GET")
+            HTTPRequestHandler._debug("do_GET")
         global favicon
 
         # get the thread
         cur_thread = threading.current_thread()
         if _debug:
-            ThreadedHTTPRequestHandler._debug("    - cur_thread: %r", cur_thread)
+            HTTPRequestHandler._debug("    - cur_thread: %r", cur_thread)
 
         # parse query data and params to find out what was passed
         parsed_params = urlparse(self.path)
         if _debug:
-            ThreadedHTTPRequestHandler._debug("    - parsed_params: %r", parsed_params)
+            HTTPRequestHandler._debug("    - parsed_params: %r", parsed_params)
         parsed_query = parse_qs(parsed_params.query)
         if _debug:
-            ThreadedHTTPRequestHandler._debug("    - parsed_query: %r", parsed_query)
+            HTTPRequestHandler._debug("    - parsed_query: %r", parsed_query)
 
         # find the pieces
         args = parsed_params.path.split("/")
         if _debug:
-            ThreadedHTTPRequestHandler._debug("    - args: %r", args)
+            HTTPRequestHandler._debug("    - args: %r", args)
 
         if args[1] == "read":
+            self.send_response(202)
             self.do_read(args[2:])
         elif args[1] == "whois":
+            self.send_response(202)
             self.do_whois(args[2:])
+        elif args[1] == "readpropertymultiple":
+            self.send_response(404)
+            self.send_header(b"Content-Type", "text/plain")
+            self.end_headers()
+            msg = ("'readpropertymultiple' API request must be POST request")
+            self.wfile.write(bytes(msg, 'utf-8'))
         elif args[1] == "favicon.ico":
             self.send_response(200)
-            self.send_header("Content-type", "image/x-icon")
+            self.send_header("Content-Type", "image/x-icon")
             self.send_header("Content-Length", len(favicon))
             self.end_headers()
             self.wfile.write(favicon)
         else:
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
+            self.send_response(400)
+            self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"'read' or 'whois' expected")
 
-    def do_read(self, args):
+        return
+
+
+    def do_POST(self):
+        """
+        Example
+        """
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length)
+        body_json = json.loads(body.decode('utf-8'))
+
+        # Print current thread for help
+        cur_thread = threading.current_thread()
+
+        # parse query data and params to find out what was passed
+        parsed_params = urlparse(self.path)
+
+        # find the pieces
+        args = parsed_params.path.split("/")
+
         if _debug:
-            ThreadedHTTPRequestHandler._debug("do_read %r", args)
+            HTTPRequestHandler._debug("    - parsed_params: %r", parsed_params)
+            HTTPRequestHandler._debug("    - args: %r", args)
+            HTTPRequestHandler._debug("    - cur_thread: %r", cur_thread)
+            HTTPRequestHandler._debug("    - body_json: %r", body_json)
+            HTTPRequestHandler._debug("    - path: %r", self.path)
+            HTTPRequestHandler._debug("    - headers: %r", self.headers)
+
+        if args[1] == "readpropertymultiple":
+            self.send_response(202)
+            self.do_ReadPropertyMultiple(args, body_json)
+
+        else:
+            self.send_response(400)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"'readpropertymultiple' expected from POST request")
+
+        return
+
+
+    def do_read(self, args):
+
+        if _debug:
+            HTTPRequestHandler._debug("do_read %r", args)
 
         try:
             addr, obj_id = args[:2]
@@ -232,27 +208,29 @@ class ThreadedHTTPRequestHandler(SimpleHTTPRequestHandler):
             if len(args) == 5:
                 request.propertyArrayIndex = int(args[4])
             if _debug:
-                ThreadedHTTPRequestHandler._debug("    - request: %r", request)
+                HTTPRequestHandler._debug("    - request: %r", request)
 
             # make an IOCB
             iocb = IOCB(request)
+            timeout = int(self.headers.get('X-bacnet-timeout', 5))
+            iocb.set_timeout(timeout, err=TimeoutError)
             if _debug:
-                ThreadedHTTPRequestHandler._debug("    - iocb: %r", iocb)
+                HTTPRequestHandler._debug("    - iocb: %r", iocb)
 
             # give it to the application
             deferred(this_application.request_io, iocb)
 
-            # wait for it to complete
+            # Wait for it to complete
             iocb.wait()
 
             # filter out errors and aborts
             if iocb.ioError:
                 if _debug:
-                    ThreadedHTTPRequestHandler._debug("    - error: %r", iocb.ioError)
+                    HTTPRequestHandler._debug("    - error: %r", iocb.ioError)
                 result = {"error": str(iocb.ioError)}
             else:
                 if _debug:
-                    ThreadedHTTPRequestHandler._debug(
+                    HTTPRequestHandler._debug(
                         "    - response: %r", iocb.ioResponse
                     )
                 apdu = iocb.ioResponse
@@ -262,7 +240,7 @@ class ThreadedHTTPRequestHandler(SimpleHTTPRequestHandler):
                     apdu.objectIdentifier[0], apdu.propertyIdentifier
                 )
                 if _debug:
-                    ThreadedHTTPRequestHandler._debug("    - datatype: %r", datatype)
+                    HTTPRequestHandler._debug("    - datatype: %r", datatype)
                 if not datatype:
                     raise TypeError("unknown datatype")
 
@@ -275,7 +253,7 @@ class ThreadedHTTPRequestHandler(SimpleHTTPRequestHandler):
                     else:
                         datatype = datatype.subtype
                     if _debug:
-                        ThreadedHTTPRequestHandler._debug(
+                        HTTPRequestHandler._debug(
                             "    - datatype: %r", datatype
                         )
 
@@ -284,23 +262,34 @@ class ThreadedHTTPRequestHandler(SimpleHTTPRequestHandler):
                 if hasattr(value, "dict_contents"):
                     value = value.dict_contents(as_class=OrderedDict)
                 if _debug:
-                    ThreadedHTTPRequestHandler._debug("    - value: %r", value)
+                    HTTPRequestHandler._debug("    - value: %r", value)
 
                 result = {"value": value}
 
         except Exception as err:
-            ThreadedHTTPRequestHandler._exception("exception: %r", err)
+            HTTPRequestHandler._exception("exception: %r", err)
             result = {"exception": str(err)}
 
         # encode the results as JSON, convert to bytes
         result_bytes = json.dumps(result).encode("utf-8")
 
         # write the result
+        self.send_header('Content-Type', 'Application/json')
+        self.end_headers()
         self.wfile.write(result_bytes)
 
+
     def do_whois(self, args):
+
+        NOT_IMPLEMENTED = True
+        if NOT_IMPLEMENTED:
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(NotImplementedError('WhoIs not implemented'))
+            return
+
         if _debug:
-            ThreadedHTTPRequestHandler._debug("do_whois %r", args)
+            HTTPRequestHandler._debug("do_whois %r", args)
 
         try:
             # build a request
@@ -315,28 +304,330 @@ class ThreadedHTTPRequestHandler(SimpleHTTPRequestHandler):
                 request.deviceInstanceRangeLowLimit = int(args[0])
                 request.deviceInstanceRangeHighLimit = int(args[1])
             if _debug:
-                ThreadedHTTPRequestHandler._debug("    - request: %r", request)
+                HTTPRequestHandler._debug("    - request: %r", request)
 
             # make an IOCB
             iocb = IOCB(request)
+            timeout = int(self.headers.get('X-bacnet-timeout', 5))
+            iocb.set_timeout(timeout, err=TimeoutError)
             if _debug:
-                ThreadedHTTPRequestHandler._debug("    - iocb: %r", iocb)
+                HTTPRequestHandler._debug("    - iocb: %r", iocb)
 
-            # give it to the application
-            this_application.request_io(iocb)
+            # Give it to the application
+            deferred(this_application.request_io, iocb)
+            iocb.wait()
 
-            # no result -- it would be nice if these were the matching I-Am's
-            result = {}
+            if iocb.ioError:
+                if _debug:
+                    HTTPRequestHandler._debug("    - error: %r", iocb.ioError)
+                result = {"error": str(iocb.ioError)}
+
+            else:
+                if _debug:
+                    HTTPRequestHandler._debug(
+                        "    - response: %r", iocb.ioResponse
+                    )
+                apdu = iocb.ioResponse
+
+                # find the datatype
+                datatype = get_datatype(
+                    apdu.objectIdentifier[0], apdu.propertyIdentifier
+                )
+                if _debug:
+                    HTTPRequestHandler._debug("    - datatype: %r", datatype)
+                if not datatype:
+                    raise TypeError("unknown datatype")
+
+                # special case for array parts, others are managed by cast_out
+                if issubclass(datatype, Array) and (
+                    apdu.propertyArrayIndex is not None
+                ):
+                    if apdu.propertyArrayIndex == 0:
+                        datatype = Unsigned
+                    else:
+                        datatype = datatype.subtype
+                    if _debug:
+                        HTTPRequestHandler._debug(
+                            "    - datatype: %r", datatype
+                        )
+
+                # convert the value to a dict if possible
+                value = apdu.propertyValue.cast_out(datatype)
+                if hasattr(value, "dict_contents"):
+                    value = value.dict_contents(as_class=OrderedDict)
+                if _debug:
+                    HTTPRequestHandler._debug("    - value: %r", value)
+
+                result = {"value": value}
 
         except Exception as err:
-            ThreadedHTTPRequestHandler._exception("exception: %r", err)
+            HTTPRequestHandler._exception("exception: %r", err)
             result = {"exception": str(err)}
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            result_bytes = json.dumps(result).encode("utf-8")
+            self.wfile.write(result_bytes)
+            return
 
         # encode the results as JSON, convert to bytes
         result_bytes = json.dumps(result).encode("utf-8")
 
         # write the result
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
         self.wfile.write(result_bytes)
+        return
+
+    def _form_ReadPropertyMultiple_request(self, args, body_json):
+        """
+        Example Read
+        http://localhost/read/adderss/analogValue:1
+        http://localhost/read/<address>/<object type>:<object instance number>
+        http://localhost/read/<address>/<object type>:<object instance number>/<property>
+        http://localhost:8081/read/192.168.1.100/analogValue:0/presentValue
+
+        Example WhoIs
+        http://localhost/whois/<address>
+
+        Example ReadPropertyMultiple
+        http://localhost:8081/readpropertymultiple/<address>/
+
+        body_json = {'address':'192.168.1.100',
+                'bacnet_objects': [{'object': 'analogValue:1',
+                                    'property': 'presentValue'},
+                                   {'object': 'analogValue:2',
+                                    'property': 'presentValue'},
+                                   {'object': 'analogValue:3',
+                                    'property': 'presentValue'}]}
+        """
+        # Error check request
+        if body_json['bacnet_objects'].__len__() == 0:
+            # No objects defined in list
+            msg = ('No BACnet object specifiers were passed. '+
+                   'Must include specifiers like {"object":"analogValue:1",' +
+                   '"property":"presentValue"}'
+                   )
+            self.send_header('Content-Type','text/plain')
+            self.end_headers()
+            self.wfile.write(bytes(msg, 'utf-8'))
+            raise ValueError(msg)
+
+        if not 'bacnet_objects' in body_json.keys():
+            # Improperty structured JSON request
+            msg = ('Bad request format. "bacnet_objects" must be a key '+
+                   'in the request body JSON oject. Got {}'.format(str(body_json.keys()))
+                   )
+            self.send_header('Content-Type','text/plain')
+            self.end_headers()
+            self.wfile.write(bytes(msg, 'utf-8'))
+            raise ValueError(msg)
+
+        # Build Read Access Spec List
+        read_access_spec_list = []
+        """Formatted like
+        results = {'analogValue:1' : {'presentValue':'1',
+                                      'objectName':'some_name',
+                                      'arrayResult':[1,2,3]},
+                   'analogValue:2' : {'presentValue':'4'}
+                   }"""
+
+        for bacnet_object in body_json['bacnet_objects']:
+
+            # Property reference list (for EACH object being requested)
+            prop_reference_list = []
+            try:
+                # What is the object identifier?
+                obj_id = ObjectIdentifier(bacnet_object['object']).value
+                # Get the object type
+                if not get_object_class(obj_id[0]):
+                    # The passed value is not a valid BACnet object type
+                    msg = ('The requested Object Identifier is not a valid BACnet '+
+                           'object type. Got {}'.format(str(obj_id))
+                           )
+                    self.wfile.write(bytes(msg, 'utf-8'))
+                    raise ValueError(msg)
+            except ValueError:
+                # The passed value is not a valid BACnet object type
+                msg = ('The requested Object Identifier is not a valid BACnet '+
+                       'object type. Got {}'.format(str(obj_id))
+                       )
+                self.send_header('Content-Type','text/plain')
+                self.end_headers()
+                self.wfile.write(bytes(msg, 'utf-8'))
+                raise ValueError(msg)
+
+            # Property ID
+            prop_id = bacnet_object['property']
+            if prop_id not in PropertyIdentifier.enumerations:
+                # Invalid property identifier - usually 'presentValue' or 'all'
+                msg = ('Invalid BACnet property. Valid propery must be one of '+
+                       '{}'.format(str(PropertyIdentifier.enumerations.keys()))
+                       )
+                self.send_header('Content-Type','text/plain')
+                self.end_headers()
+                self.wfile.write(bytes(msg, 'utf-8'))
+                raise ValueError(msg)
+
+            # Object datatype
+            datatype = get_datatype(obj_id[0], prop_id)
+            if (datatype is None) and (prop_id != 'all'):
+                # For converting between BACnet data types and pyton types
+                msg = ('Invalid combination of BACnet object type and property ID '+
+                       'Got {}, {}'.format(str(obj_id), str(prop_id))
+                       )
+                self.send_header('Content-Type','text/plain')
+                self.end_headers()
+                self.wfile.write(bytes(msg, 'utf-8'))
+                raise ValueError(msg)
+
+            # Build property reference
+            # Not sure what this is - check ASHRAE standard lol
+            prop_reference = PropertyReference(propertyIdentifier=prop_id)
+            # Array index for BACnet objects with multiple values
+            # Array index not supported for this API - just get the whole array
+            prop_reference_list.append(prop_reference)
+
+            # Build read access specification
+            read_access_spec = ReadAccessSpecification(
+                objectIdentifier=obj_id,
+                listOfPropertyReferences=prop_reference_list
+                )
+            read_access_spec_list.append(read_access_spec)
+
+        # Build request
+        request = ReadPropertyMultipleRequest(
+            listOfReadAccessSpecs=read_access_spec_list,
+            )
+        request.pduDestination = Address(body_json['address'])
+        return request
+
+
+    def do_ReadPropertyMultiple(self, args, body_json):
+        global apdu
+        """
+        Example Read
+        http://localhost/read/adderss/analogValue:1
+        http://localhost/read/<address>/<object type>:<object instance number>
+        http://localhost/read/<address>/<object type>:<object instance number>/<property>
+        http://localhost:8081/read/192.168.1.100/analogValue:0/presentValue
+
+        Example WhoIs
+        http://localhost/whois/<address>
+
+        Example ReadPropertyMultiple
+        http://localhost:8081/readpropertymultiple/<address>/
+
+        args = {'address':'192.168.1.100',
+                'bacnet_objects': [{'object': 'analogValue:1',
+                                    'property': 'presentValue'},
+                                   {'object': 'analogValue:2',
+                                    'property': 'presentValue'},
+                                   {'object': 'analogValue:3',
+                                    'property': 'presentValue'}]}
+        """
+        # Init results JSON
+        results = {}
+        try:
+            request = self._form_ReadPropertyMultiple_request(args, body_json)
+        except ValueError:
+            # Headers are already written
+            self.wfile.write(b'End of response')
+            return
+
+        # Make IOControlBlock
+        iocb = IOCB(request)
+        timeout = int(self.headers.get('X-bacnet-timeout', 4))
+        iocb.set_timeout(timeout, err=TimeoutError)
+        # Give iocb to app
+        deferred(this_application.request_io, iocb)
+        # Wait for completion
+        iocb.wait()
+
+        """Format of the response
+        ObjectIdentifier
+            PropertyIdentifier : PropertyValue
+        """
+
+        # Success
+        if iocb.ioResponse:
+            apdu = iocb.ioResponse
+
+            # Acknowledgement response
+            if not isinstance(apdu, ReadPropertyMultipleACK):
+                msg = ('Received improper read property multiple response. ' +
+                       'The expected response type was an acknowledgement, ' +
+                       'got {}'.format(str(type(apdu)))
+                       )
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(bytes(msg, 'utf-8'))
+                return
+
+            # loop through the results
+            for result in apdu.listOfReadAccessResults:
+                # Object identifiers are top
+                objectIdentifier = result.objectIdentifier
+                results[str(objectIdentifier)] = {}
+
+                for element in result.listOfResults:
+                    # Properties and array elements of each object are bottom
+                    propertyIdentifier = element.propertyIdentifier
+                    propertyArrayIndex = element.propertyArrayIndex
+                    readResult = element.readResult
+
+                    if readResult.propertyAccessError:
+                        results[str(objectIdentifier)][str(propertyIdentifier)] = \
+                            readResult.propertyAccessError
+                        continue # Skip this result
+
+                    # Form the message response
+                    propertyValue = readResult.propertyValue
+                    dtype = get_datatype(objectIdentifier[0], propertyIdentifier)
+                    if issubclass(dtype, Array) and (propertyArrayIndex is not None):
+                        # The property value is an array of values
+                        if propertyArrayIndex == 0:
+                            # Result is the first index of array
+                            # See http://kargs.net/BACnet/Foundations2015-Developer-Q-A.pdf
+                            value = propertyValue.cast_out(Unsigned)
+                        else:
+                            # Cast BACnet array to python array with elements
+                            # Matching the BACnet array subtype
+                            # [BACint, BACint, BACint] -> [pyint, pyint, pyint]
+                            value = propertyValue.cast_out(dtype.subtype)
+                    else:
+                        # The value is not an array (single value)
+                        value = propertyValue.cast_out(dtype)
+
+                    # Form response JSON object
+                    """results = {'analogValue:1' : {'presentValue':'1',
+                                                     'objectName':'some_name',
+                                                     'arrayResult':[1,2,3]},
+                                  'analogValue:2' : {'presentValue':'4'}
+                                  }
+                    """
+                    results[str(objectIdentifier)][str(propertyIdentifier)] = value
+        else:
+            # Error
+            msg = ('Received improper BACnet response {}'.format(str(iocb))
+                   )
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(bytes(msg, 'utf-8'))
+            return
+
+        # Write the response
+        try:
+            msg = bytes(json.dumps(results), 'utf-8')
+        except TypeError:
+            # Cannot serialize value of results
+            msg = bytes(json.dumps(results, default=lambda o: str(o)), 'utf-8')
+
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(msg)
+        return
+
+
 
 
 class ThreadedTCPServer(ThreadingMixIn, TCPServer):
@@ -346,65 +637,81 @@ class ThreadedTCPServer(ThreadingMixIn, TCPServer):
 #
 #   __main__
 #
+
+def main(child_thread=False):
+    global this_application, server, server_thread, bac_thread
+
+    try:
+        # parse the command line arguments
+        parser = ConfigArgumentParser(description=__doc__)
+        # add an option for the server host
+        parser.add_argument("--host", type=str, help="server host", default=HOST)
+        # add an option for the server port
+        parser.add_argument("--port", type=int, help="server port", default=PORT)
+        args = parser.parse_args()
+        # Adding arguments to the argument parser (Not used)
+        # config_path = r"C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\bacnet_client.ini"
+        # args = parser.parse_args(['--ini', config_path])
+
+        if _debug:
+            _log.debug("initialization")
+            _log.debug("    - args: %r", args)
+
+        # Make a device object
+        this_device = LocalDeviceObject(ini=args.ini)
+
+        # Make a simple application
+        this_application = BIPSimpleApplication(this_device, args.ini.address)
+
+        # local host, special port
+        server = ThreadedTCPServer((args.host, args.port), HTTPRequestHandler)
+
+        # Start a thread with the server -- that thread will then start a thread for each request
+        server_thread = threading.Thread(target=server.serve_forever)
+
+        # exit the server thread when the main thread terminates
+        server_thread.daemon = True # Exit when program terminates
+        server_thread.start()
+
+        if _debug:
+            _log.debug("running")
+            _log.debug("    - server_thread: %r", server_thread)
+            _log.debug("    - server: %r", server)
+            _log.debug("    - this_device: %r", this_device)
+
+        if child_thread==True:
+            # Start the BACnet application in a child thread
+            # Child threads do not receive signals SIGTERM or SIGUSR1
+            bac_thread = threading.Thread(target=run)
+            bac_thread.daemon = False # Keep the thread open for interactive
+            bac_thread.start()
+        else:
+            run()
+
+    except Exception as err:
+        _log.exception("an error has occurred: %s", err)
+
+    finally:
+        if server:
+            server.shutdown()
+        if this_application:
+            # Close the port manually if needed
+            this_application.mux.directPort.handle_close()
+            stop()
+        if _debug:
+            _log.debug("finally")
+    return
+
+
 #%%
-try:
-    # parse the command line arguments
-    parser = ConfigArgumentParser(description=__doc__)
 
-    # add an option for the server host
-    parser.add_argument("--host", type=str, help="server host", default=HOST)
-    # add an option for the server port
-    parser.add_argument("--port", type=int, help="server port", default=PORT)
-    args = parser.parse_args(['--ini', config_path])
+if __name__ == '__main__':
+    """Begin BACnet client when this script is run as a top-level scope
+    Example of top-level scope -
+    python httpServer.py
+    python -m httpServer.py
 
-    if _debug:
-        _log.debug("initialization")
-    if _debug:
-        _log.debug("    - args: %r", args)
-
-    # make a device object
-    this_device = LocalDeviceObject(
-        objectName=config['bacnet_client']['objectName'],
-        objectIdentifier=int(config['bacnet_client']['objectIdentifier']),
-        maxApduLengthAccepted=int(config['bacnet_client']['maxApduLengthAccepted']),
-        segmentationSupported=config['bacnet_client']['segmentationSupported'],
-        vendorIdentifier=int(config['bacnet_client']['vendorIdentifier']),
-        )
-    if _debug:
-        _log.debug("    - this_device: %r", this_device)
-
-    # make a simple application
-    this_application = BIPSimpleApplication(this_device, args.ini.address)
-    # this_application.mux.directPort.handle_close()
-
-    # local host, special port
-    server = ThreadedTCPServer((args.host, args.port), ThreadedHTTPRequestHandler)
-    if _debug:
-        _log.debug("    - server: %r", server)
-
-    # Start a thread with the server -- that thread will then start a thread for each request
-    server_thread = threading.Thread(target=server.serve_forever)
-    if _debug:
-        _log.debug("    - server_thread: %r", server_thread)
-
-    # exit the server thread when the main thread terminates
-    server_thread.daemon = True
-    server_thread.start()
-
-    if _debug:
-        _log.debug("running")
-
-    run()
-
-except Exception as err:
-    _log.exception("an error has occurred: %s", err)
-
-finally:
-    if server:
-        server.shutdown()
-    if this_application:
-        this_application.mux.directPort.handle_close()
-        stop()
-
-    if _debug:
-        _log.debug("finally")
+    Example - not executed as top-level
+    from httpServer import main
+    """
+    main(child_thread=False)

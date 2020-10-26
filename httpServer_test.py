@@ -5,40 +5,302 @@ Created on Mon Sep 28 20:32:55 2020
 @author: z003vrzk
 """
 
-
 # Python imports
 import unittest
-import os
-import threading
+from urllib.parse import urlparse, parse_qs
 import json
-import zlib
-from collections import OrderedDict
-import configparser
-from urlparse import urlparse, parse_qs
-from SocketServer import ThreadingMixIn, TCPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+import threading
+from queue import Queue, Empty
+import time
+import subprocess
+import re
 
 # Third party imports
-from bacpypes.debugging import bacpypes_debugging, ModuleLogger
+import requests
+from bacpypes.core import run, stop
 from bacpypes.consolelogging import ConfigArgumentParser
-
-from bacpypes.core import run, deferred, stop
 from bacpypes.iocb import IOCB
-
-from bacpypes.pdu import Address, GlobalBroadcast
-from bacpypes.apdu import ReadPropertyRequest, WhoIsRequest
-from bacpypes.primitivedata import Unsigned, ObjectIdentifier
-from bacpypes.constructeddata import Array
-
+from bacpypes.pdu import Address
+from bacpypes.apdu import ReadPropertyRequest
+from bacpypes.primitivedata import ObjectIdentifier
 from bacpypes.app import BIPSimpleApplication
 from bacpypes.object import get_object_class, get_datatype
 from bacpypes.local.device import LocalDeviceObject
+
+# Local imports
+from httpServer import HTTPRequestHandler, ThreadedTCPServer
+import httpServer
+
+# Globals & Declarations
+process_queue = Queue()
+ini_file = r"C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\bacnet_client.ini"
+HOST, PORT = 'localhost','8083'
+BAC_SERVER_ADDRESS = '192.168.1.100'
+
+# Check if network interface is active
+import subprocess
+cmd = ['netsh','interface','show','interface']
+process = subprocess.run(cmd, stdout=subprocess.PIPE)
+"""
+'Admin State    State          Type             Interface Name',
+ '-------------------------------------------------------------------------',
+ 'Enabled        Connected      Dedicated        Wi-Fi'
+ """
+ADAPTER_ENABLED = False
+ADAPTER_CONNECTED = False
+for line in process.stdout.decode().split('\r\n'):
+    if re.search('Ethernet', line):
+        if re.search('Enabled', line):
+            ADAPTER_ENABLED = True
+        if re.search('Connected', line):
+            ADAPTER_CONNECTED = True
 
 
 
 #%%
 
-class httpServerTest(unittest.TestCase):
+
+class BacnetHTTPServerTest(unittest.TestCase):
+
+    def setUp(self):
+        global server, server_thread, this_application
+        # parse the command line arguments
+        parser = ConfigArgumentParser(description=__doc__)
+        # add an option for the server host
+        parser.add_argument("--host", type=str, help="server host", default=HOST)
+        # add an option for the server port
+        parser.add_argument("--port", type=int, help="server port", default=PORT)
+
+        # Adding arguments to the argument parser
+        config_path = "./bacnet_client.ini"
+        args = parser.parse_args(['--ini', config_path])
+
+        # Make a HTTP Server
+        server = ThreadedTCPServer((args.host, args.port), HTTPRequestHandler)
+
+        # Start a thread with the server -- that thread will then start a thread for each request
+        server_thread = threading.Thread(target=server.serve_forever)
+
+        # exit the server thread when the main thread terminates
+        server_thread.daemon = True # Exit when program terminates
+        server_thread.start()
+        print("HTTP Server Thread is Alive : ", server_thread.is_alive())
+
+        # Make a device object
+        this_device = LocalDeviceObject(ini=args.ini)
+
+        # Make a simple application
+        this_application = BIPSimpleApplication(this_device, args.ini.address)
+        httpServer.this_application = this_application
+
+        # Start the BACnet application in a child thread
+        # Child threads do not receive signals SIGTERM or SIGUSR1
+        bac_thread = threading.Thread(target=run)
+        bac_thread.daemon = True # Exit when program terminates
+        bac_thread.start()
+        print("BACnet client Thread is Alive : ", bac_thread.is_alive())
+
+        return
+
+
+    def tearDown(self):
+
+        # Stop the HHTP Server
+        # stop servce_forever loop and wait until it stops
+        server.shutdown()
+        # Clean up the server - Release socket
+        server.server_close()
+
+        # Stop the BACnet client
+        # Close the port manually if needed
+        stop()
+        this_application.mux.directPort.handle_close()
+
+
+    def test_POST_400(self):
+        """General implementation of POST method -
+        This does not test a specific API request
+        Bad URI request"""
+        url = 'http://{}:{}/bad-url/'.format(HOST, PORT)
+        headers = {'Content-Type':'application/json',
+                   }
+        bacnet_object1 = {'object':'analogValue:1',
+                          'property':'presentValue'}
+        bacnet_object2 = {'object':'analogValue:2',
+                          'property':'presentValue'}
+        bacnet_object3 = {'object':'analogValue:3',
+                          'property':'presentValue'}
+        body = {'bacnet_objects':[bacnet_object1, bacnet_object2, bacnet_object3],
+                'address':'192.168.1.100'}
+
+        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=2)
+        test_content = b"'readpropertymultiple' expected from POST request"
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.content, test_content)
+
+        return
+
+
+    def test_GET_400(self):
+        """Bad URI request"""
+        url = 'http://{}:{}/bad-url'.format(HOST, PORT)
+        headers = {'Content-Type':'application/json',
+                   }
+        res = requests.get(url, headers=headers, timeout=2)
+        test_content = b"'read' or 'whois' expected"
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.content, test_content)
+
+        return
+
+
+    def test_encode_json(self):
+        bacnet_object1 = {'object':'analogValue:1',
+                          'property':'presentValue'}
+        bacnet_object2 = {'object':'analogValue:2',
+                          'property':'presentValue'}
+        bacnet_object3 = {'object':'analogValue:3',
+                          'property':'presentValue'}
+        body = {'bacnet_objects':[bacnet_object1, bacnet_object2, bacnet_object3],
+                'address':'192.168.1.100'}
+
+        # Incorrect - Form encoded (not JSON encoded)
+        res2 = requests.post('https://httpbin.org/post', data=body, timeout=2)
+        test2_dict = {'form': {'address': '192.168.1.100',
+                               'bacnet_objects': ['object', 'property',
+                                                  'object', 'property',
+                                                  'object', 'property']}}
+        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(res2.json()['form'], test2_dict['form'])
+
+        # Correct - String JSON representation
+        # The resulting json is actually a string (not dict)
+        res3 = requests.post('https://httpbin.org/post', data=json.dumps(body), timeout=2)
+        test3_dict = {'bacnet_objects': [{'object': 'analogValue:1', 'property': 'presentValue'},
+                                         {'object': 'analogValue:2', 'property': 'presentValue'},
+                                         {'object': 'analogValue:3', 'property': 'presentValue'}],
+                      'address': '192.168.1.100'}
+        self.assertEqual(res3.status_code, 200)
+        self.assertEqual(json.loads(res3.json()['data']), test3_dict)
+
+        # Correct - pass python object with json keyword
+        res4 = requests.post('https://httpbin.org/post', json=body, timeout=2)
+        test4_dict = {'bacnet_objects': [{'object': 'analogValue:1', 'property': 'presentValue'},
+                                         {'object': 'analogValue:2', 'property': 'presentValue'},
+                                         {'object': 'analogValue:3', 'property': 'presentValue'}],
+                      'address': '192.168.1.100'}
+        self.assertEqual(res4.status_code, 200)
+        self.assertEqual(json.loads(res4.json()['data']), test4_dict)
+
+        return
+
+
+    @unittest.skip("WhoIs method is not implemented in the HTTP server")
+    def test_WHOIS(self):
+
+        # Make some requests
+        url = 'http://{}:{}/whois/192.168.1.100'.format(HOST,PORT)
+        headers = {'X-bacnet-timeout':'3', 'Content-Type':'application/json'}
+        res = requests.get(url, headers=headers, timeout=5)
+
+        self.assertEqual(res.status_code, 202)
+
+        return
+
+
+    def test_READ(self):
+
+        # Make some requests
+        url = 'http://{}:{}/read/192.168.1.100/analogInput:0'.format(HOST,PORT)
+        headers = {'X-bacnet-timeout':'3', 'Content-Type':'application/json'}
+        res = requests.get(url, headers=headers, timeout=5)
+        self.assertEqual(res.status_code, 202)
+        self.assertTrue('value' in res.json().keys())
+        return
+
+
+    def test_ReadPropertyMultiple(self):
+
+        url = 'http://{}:{}/readpropertymultiple/'.format(HOST, PORT)
+        headers = {'Content-Type':'application/json',
+                   }
+        bacnet_object1 = {'object':'analogValue:10000',
+                          'property':'presentValue'}
+        bacnet_object2 = {'object':'analogValue:10001',
+                          'property':'presentValue'}
+        bacnet_object3 = {'object':'analogValue:10002',
+                          'property':'all'}
+        body = {'bacnet_objects':[bacnet_object1, bacnet_object2, bacnet_object3],
+                'address':'192.168.1.100'}
+
+        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=2)
+
+        self.assertEqual(res.status_code, 202)
+        self.assertTrue("('analogValue', 10000)" in res.json().keys())
+        self.assertTrue("('analogValue', 10001)" in res.json().keys())
+        self.assertTrue("('analogValue', 10002)" in res.json().keys())
+
+        return
+
+
+    def test_invalid_bacnet_object(self):
+        return
+
+    def test_invalid_address(self):
+        return
+
+    def test_whois(self):
+        return
+
+    def test_invalid_whois(self):
+        return
+
+    def test_routed_MSTP_object(self):
+        return
+
+    def test_(self):
+        return
+
+
+
+if __name__ == '__main__':
+    # Three ways to run test suites or their methods
+
+    # # Method 1 - Running a test case
+    # suite = unittest.TestLoader().loadTestsFromTestCase(BacnetHTTPServerTest)
+    # unittest.TextTestRunner(verbosity=2).run(suite)
+
+    # # Method 2 - Running a test case
+    # unittest.main(BacnetHTTPServerTest())
+
+    # Method 3 - Running a SINGLE test method from a test case
+    suite = unittest.TestSuite()
+    suite.addTest(BacnetHTTPServerTest('test_ReadPropertyMultiple'))
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
+
+
+
+
+
+
+#%%
+
+def enqueue_output(out, queue):
+    for line in iter(out.readline, b''):
+        queue.put(line)
+    out.close()
+    return
+
+def read_process():
+    try:  line = process_queue.get_nowait() # or q.get(timeout=.1)
+    except Empty:
+        print('no output yet')
+    else: # got line
+        print(line)
+    return
+
+class OfflineBacnetTest(unittest.TestCase):
 
     def setUp(self):
 
@@ -86,48 +348,69 @@ class httpServerTest(unittest.TestCase):
                 'Object Name':'!weatherpxc:ALMCNT'}
             }
 
+        # Create a BACnet Client to do testing
+        self.init_bacnet_client()
 
         return None
 
-    def test_parse(self):
-        path = 'http://localhost:8080/read/10101/1'
-        cur_thread = threading.current_thread()
-        print('Current Thread', cur_thread)
+    def tearDown(self):
+        self.close_bacnet_client()
+        return None
 
+    def init_bacnet_client(self):
+        """Initialize the BACnet client application that is used to communicate
+        on the network"""
+
+        global process, t
+        executable = r'C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\httpServer.py'
+        args = ['python', executable,
+                '--ini', ini_file,
+                '--host', HOST,
+                '--port', PORT,
+                '--debug', '__main__.ThreadedHTTPRequestHandler',
+                '--debug','__main__',
+                ]
+        process = subprocess.Popen(args,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        # Give time for process to start up
+        time.sleep(3)
+        t = threading.Thread(target=enqueue_output, args=(process.stdout, process_queue))
+        t.daemon = True # thread dies with the program
+        t.start()
+        print("Read thread is alive : ", t.is_alive())
+
+        return
+
+
+    def close_bacnet_client(self):
+        """Call kill() method on process returned by subprocess.Popen"""
+        if not process:
+            print("Process has not been started")
+            raise(Exception("Attempted process terminate without running process"))
+        elif process.poll() == 1:
+            # Process is already closed
+            print("Process already terminated")
+        else:
+            process.kill()
+
+        return
+
+
+    def test_parse(self):
+        path = 'http://localhost:8080/read/192.168.1.100/analogInput:0'
         parsed_params = urlparse(path)
         print('parsed parameters from URL', parsed_params)
-        parsed_query = parse_qs(parsed_params.query)
         args = parsed_params.path.split("/")
         print('Parsed parameters from path', args)
 
-        if args[1] == "read":
-            print("Read request", args[1])
-            print('Read call signature: self.do_read({})'.format(args[2:]))
-            # Example
-            # self.do_read(args[2:])
-        elif args[1] == "whois":
-            print("WhoIs request", args[1])
-            print('WhoIs call signature: self.do_whois({})'.format(args[2:]))
-            # Example
-            # self.do_whois(args[2:])
-        elif args[1] == "favicon.ico":
-            print("favicon.ico request", args[1])
-            # Example
-            # self.send_response(200)
-            # self.send_header("Content-type", "image/x-icon")
-            # self.send_header("Content-Length", len(favicon))
-            # self.end_headers()
-            # self.wfile.write(favicon)
-        else:
-            # Invalid format
-            print(str(
-                # self.send_response(200)
-                # self.send_header("Content-type", "text/plain")
-                # self.end_headers()
-                # self.wfile.write(b"'read' or 'whois' expected")
-                ))
+        self.assertEqual(args[0], '')
+        self.assertEqual(args[1], 'read')
+        self.assertEqual(args[2], '192.168.1.100')
+        self.assertEqual(args[3], 'analogInput:0')
 
         return None
+
 
     def test_ObjectIdentifier(self):
         """Test valid inputs to ObjectIdentifier
@@ -151,178 +434,31 @@ class httpServerTest(unittest.TestCase):
         self.assertEqual(res[1], 1)
         return None
 
-    def test_do_read(self, read_args=('192.168.1.100', 'analogValue:1')):
+
+    def test_make_iocb(self):
         """inputs
         -------
-        read_args : (iterable) of ('', 'read', address, object id)
-            address : (int)
-            object ID : (int)"""
+        read_args : (iterable) of ('', 'read', <address>, <object_identifier>)
+            address : (str) BACnet IP address of device we are trying to
+                communicate with. Example 192.168.1.100
+            object_identifier : (str) BACnet Object Identifier of the device
+                defined in 'address'. This is of the form
+                <ObjectType>:<Instance>.
+                Typical values for ObjectType can be found where?
+            """
 
-        try:
-            addr, obj_id = read_args[:2]
-            obj_id = ObjectIdentifier(obj_id).value
+        read_args=('192.168.1.100', 'analogValue:1')
 
-            # get the object type
-            if not get_object_class(obj_id[0]): # bacpypes.object.AnalogInputObject
-                raise ValueError("unknown object type")
-
-            # implement a default property, the bain of committee meetings
-            if len(args) == 3:
-                prop_id = args[2]
-            else:
-                prop_id = "presentValue"
-
-            # look for its datatype, an easy way to see if the property is
-            # appropriate for the object
-            datatype = get_datatype(obj_id[0], prop_id)
-            if not datatype:
-                raise ValueError("invalid property for object type")
-
-            # build a request
-            request = ReadPropertyRequest(
-                objectIdentifier=obj_id, propertyIdentifier=prop_id
-            )
-            request.pduDestination = Address(addr)
-
-            # look for an optional array index
-            if len(args) == 5:
-                request.propertyArrayIndex = int(args[4])
-            if _debug:
-                ThreadedHTTPRequestHandler._debug("    - request: %r", request)
-
-            # make an IOCB
-            iocb = IOCB(request)
-            if _debug:
-                ThreadedHTTPRequestHandler._debug("    - iocb: %r", iocb)
-
-            # give it to the application
-            deferred(this_application.request_io, iocb)
-
-            # wait for it to complete
-            iocb.wait()
-
-            # filter out errors and aborts
-            if iocb.ioError:
-                if _debug:
-                    ThreadedHTTPRequestHandler._debug("    - error: %r", iocb.ioError)
-                result = {"error": str(iocb.ioError)}
-            else:
-                if _debug:
-                    ThreadedHTTPRequestHandler._debug(
-                        "    - response: %r", iocb.ioResponse
-                    )
-                apdu = iocb.ioResponse
-
-                # find the datatype
-                datatype = get_datatype(
-                    apdu.objectIdentifier[0], apdu.propertyIdentifier
-                )
-                if _debug:
-                    ThreadedHTTPRequestHandler._debug("    - datatype: %r", datatype)
-                if not datatype:
-                    raise TypeError("unknown datatype")
-
-                # special case for array parts, others are managed by cast_out
-                if issubclass(datatype, Array) and (
-                    apdu.propertyArrayIndex is not None
-                ):
-                    if apdu.propertyArrayIndex == 0:
-                        datatype = Unsigned
-                    else:
-                        datatype = datatype.subtype
-                    if _debug:
-                        ThreadedHTTPRequestHandler._debug(
-                            "    - datatype: %r", datatype
-                        )
-
-                # convert the value to a dict if possible
-                value = apdu.propertyValue.cast_out(datatype)
-                if hasattr(value, "dict_contents"):
-                    value = value.dict_contents(as_class=OrderedDict)
-                if _debug:
-                    ThreadedHTTPRequestHandler._debug("    - value: %r", value)
-
-                result = {"value": value}
-
-        except Exception as err:
-            ThreadedHTTPRequestHandler._exception("exception: %r", err)
-            result = {"exception": str(err)}
-
-        # encode the results as JSON, convert to bytes
-        result_bytes = json.dumps(result).encode("utf-8")
-
-        # write the result
-        self.wfile.write(result_bytes)
-        return None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def do_GET(self):
-    if _debug:
-        ThreadedHTTPRequestHandler._debug("do_GET")
-    global favicon
-
-    # get the thread
-    cur_thread = threading.current_thread()
-    if _debug:
-        ThreadedHTTPRequestHandler._debug("    - cur_thread: %r", cur_thread)
-
-    # parse query data and params to find out what was passed
-    parsed_params = urlparse(self.path)
-    if _debug:
-        ThreadedHTTPRequestHandler._debug("    - parsed_params: %r", parsed_params)
-    parsed_query = parse_qs(parsed_params.query)
-    if _debug:
-        ThreadedHTTPRequestHandler._debug("    - parsed_query: %r", parsed_query)
-
-    # find the pieces
-    args = parsed_params.path.split("/")
-    if _debug:
-        ThreadedHTTPRequestHandler._debug("    - args: %r", args)
-
-    if args[1] == "read":
-        self.do_read(args[2:])
-    elif args[1] == "whois":
-        self.do_whois(args[2:])
-    elif args[1] == "favicon.ico":
-        self.send_response(200)
-        self.send_header("Content-type", "image/x-icon")
-        self.send_header("Content-Length", len(favicon))
-        self.end_headers()
-        self.wfile.write(favicon)
-    else:
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"'read' or 'whois' expected")
-
-def do_read(self, args):
-    if _debug:
-        ThreadedHTTPRequestHandler._debug("do_read %r", args)
-
-    try:
-        addr, obj_id = args[:2]
+        addr, obj_id = read_args[:2]
         obj_id = ObjectIdentifier(obj_id).value
 
-        # get the object type
-        if not get_object_class(obj_id[0]):
+        # Enforce a specific object type
+        if not get_object_class(obj_id[0]): # bacpypes.object.AnalogInputObject
             raise ValueError("unknown object type")
 
         # implement a default property, the bain of committee meetings
-        if len(args) == 3:
-            prop_id = args[2]
+        if len(read_args) == 3:
+            prop_id = read_args[2]
         else:
             prop_id = "presentValue"
 
@@ -339,111 +475,34 @@ def do_read(self, args):
         request.pduDestination = Address(addr)
 
         # look for an optional array index
-        if len(args) == 5:
-            request.propertyArrayIndex = int(args[4])
-        if _debug:
-            ThreadedHTTPRequestHandler._debug("    - request: %r", request)
+        if len(read_args) == 5:
+            request.propertyArrayIndex = int(read_args[4])
 
         # make an IOCB
         iocb = IOCB(request)
-        if _debug:
-            ThreadedHTTPRequestHandler._debug("    - iocb: %r", iocb)
 
-        # give it to the application
-        deferred(this_application.request_io, iocb)
+        # Information related to destination and network control (context information and processing instructions)
+        apci_contents = request.apci_contents()
+        self.assertEqual(apci_contents['destination'], read_args[0])
+        # Read property requests always require a confirmation PDU
+        self.assertEqual(apci_contents['apduType'], 'ConfirmedRequestPDU')
+        # This test only applies to ReadPropertyRequests
+        self.assertEqual(apci_contents['apduService'], 'ReadPropertyRequest')
 
-        # wait for it to complete
-        iocb.wait()
+        # Information related to DATA
+        apdu_contents = request.apdu_contents()
+        self.assertEqual(apdu_contents['function'], 'ReadPropertyRequest')
+        self.assertEqual(apdu_contents['objectIdentifier'], ('analogValue', 1))
+        self.assertEqual(apdu_contents['propertyIdentifier'], 'presentValue')
 
-        # filter out errors and aborts
-        if iocb.ioError:
-            if _debug:
-                ThreadedHTTPRequestHandler._debug("    - error: %r", iocb.ioError)
-            result = {"error": str(iocb.ioError)}
-        else:
-            if _debug:
-                ThreadedHTTPRequestHandler._debug(
-                    "    - response: %r", iocb.ioResponse
-                )
-            apdu = iocb.ioResponse
+        # Testing of IOCB - not much to test
+        self.assertIsInstance(iocb.args[0], ReadPropertyRequest)
+        return None
 
-            # find the datatype
-            datatype = get_datatype(
-                apdu.objectIdentifier[0], apdu.propertyIdentifier
-            )
-            if _debug:
-                ThreadedHTTPRequestHandler._debug("    - datatype: %r", datatype)
-            if not datatype:
-                raise TypeError("unknown datatype")
 
-            # special case for array parts, others are managed by cast_out
-            if issubclass(datatype, Array) and (
-                apdu.propertyArrayIndex is not None
-            ):
-                if apdu.propertyArrayIndex == 0:
-                    datatype = Unsigned
-                else:
-                    datatype = datatype.subtype
-                if _debug:
-                    ThreadedHTTPRequestHandler._debug(
-                        "    - datatype: %r", datatype
-                    )
+if __name__ == '__main__':
+    # Three ways to run test suites or their methods
 
-            # convert the value to a dict if possible
-            value = apdu.propertyValue.cast_out(datatype)
-            if hasattr(value, "dict_contents"):
-                value = value.dict_contents(as_class=OrderedDict)
-            if _debug:
-                ThreadedHTTPRequestHandler._debug("    - value: %r", value)
-
-            result = {"value": value}
-
-    except Exception as err:
-        ThreadedHTTPRequestHandler._exception("exception: %r", err)
-        result = {"exception": str(err)}
-
-    # encode the results as JSON, convert to bytes
-    result_bytes = json.dumps(result).encode("utf-8")
-
-    # write the result
-    self.wfile.write(result_bytes)
-
-def do_whois(self, args):
-    if _debug:
-        ThreadedHTTPRequestHandler._debug("do_whois %r", args)
-
-    try:
-        # build a request
-        request = WhoIsRequest()
-        if (len(args) == 1) or (len(args) == 3):
-            request.pduDestination = Address(args[0])
-            del args[0]
-        else:
-            request.pduDestination = GlobalBroadcast()
-
-        if len(args) == 2:
-            request.deviceInstanceRangeLowLimit = int(args[0])
-            request.deviceInstanceRangeHighLimit = int(args[1])
-        if _debug:
-            ThreadedHTTPRequestHandler._debug("    - request: %r", request)
-
-        # make an IOCB
-        iocb = IOCB(request)
-        if _debug:
-            ThreadedHTTPRequestHandler._debug("    - iocb: %r", iocb)
-
-        # give it to the application
-        this_application.request_io(iocb)
-
-        # no result -- it would be nice if these were the matching I-Am's
-        result = {}
-
-    except Exception as err:
-        ThreadedHTTPRequestHandler._exception("exception: %r", err)
-        result = {"exception": str(err)}
-
-    # encode the results as JSON, convert to bytes
-    result_bytes = json.dumps(result).encode("utf-8")
-
-    # write the result
-    self.wfile.write(result_bytes)
+    # Method 1 - Running a test case
+    suite = unittest.TestLoader().loadTestsFromTestCase(OfflineBacnetTest)
+    unittest.TextTestRunner(verbosity=2).run(suite)
