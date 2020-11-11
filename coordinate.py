@@ -6,10 +6,9 @@ Created on Mon Oct 26 16:31:17 2020
 """
 
 # Python imports
-import unittest
 import math
 import re
-
+import abc
 
 
 
@@ -70,16 +69,7 @@ that fell the past hour. The letter "p" followed by 3 numbers represents the
  replaced by "..." to indicate no data available. Solar radiation data can also
  be coded into the data packet.
 
-
-
 """
-
-"""1. How often should I send data and to which server? """
-class TaskManager:
-    """Define data posting intervals and decide on a server to send data to
-    This might not need to be implemented here"""
-    pass
-
 
 
 
@@ -100,19 +90,27 @@ class APRSCoordinate(object):
 
         if kwargs:
             try:
-                degree = kwargs['degree']
-                minute = kwargs['minute']
-                second = kwargs['second']
-            except ValueError:
+                if 'decimal_degree' in kwargs.keys():
+                    decimal_degree = kwargs['decimal_degree']
+                    self.decimal_degree = decimal_degree
+                    degree, minute, second = \
+                        self._calc_degree_minute_second(self.decimal_degree)
+
+                elif 'degree' in kwargs.keys():
+                    degree = kwargs['degree']
+                    minute = kwargs['minute']
+                    second = kwargs['second']
+
+            except KeyError:
                 msg = ("kwargs must contain keys (degree, minute, second) " +
-                       "got {}".format(args))
+                       "OR ('decimal_degree'). Got {}".format(kwargs))
                 raise ValueError(msg)
 
         elif args:
             if len(args) == 1:
-                self.degree_minute = args[0]
+                self.decimal_degree = args[0]
                 degree, minute, second = \
-                    self._calc_degree_minute_second(self.degree_minute)
+                    self._calc_degree_minute_second(self.decimal_degree)
 
             else:
                 try:
@@ -127,23 +125,28 @@ class APRSCoordinate(object):
         else:
             msg = ("Class constructor must contain either an iterable of" +
                    "(degree, minute, second), or **kwargs must contain " +
-                   "the keys {'degree','minute','second'}")
+                   "the keys {'degree','minute','second'} or {'decimal_degree'}")
+            raise ValueError(msg)
+
+        if any(((minute < 0), (second < 0))):
+            msg = ("minute or second cannot be negative numbers. When " +
+                   "representing " +
+                   "the southern or Western hemisphere pass degree as a " +
+                   "negative number")
             raise ValueError(msg)
 
         self.degree = float(degree)
-        self.minute = float(minute)
-        self.second = float(second)
-        self.decimal_degree = self._calc_decimaldegree(float(degree),
-                                                       float(minute),
-                                                       float(second))
-        self.degree_minute = self._calc_decimaldegree(float(degree),
-                                                      float(minute),
-                                                      float(second))
-
+        self.minute = abs(float(minute))
+        self.second = abs(float(second))
+        if not 'decimal_degree' in self.__dict__:
+            self.decimal_degree = self._calc_decimaldegree(float(degree),
+                                                           float(minute),
+                                                           float(second))
+        _, self.decimal_minute = self._calc_decimal_minute(float(degree),
+                                                           float(minute),
+                                                           float(second))
         return
 
-    def _find_position(self):
-        pass
 
     @staticmethod
     def _calc_decimaldegree(degree, minute, second):
@@ -167,11 +170,12 @@ class APRSCoordinate(object):
         seconds = 44
         result = degree + minute/60 + second/3600
         """
-        decimal_degree = degree + minute/60. + second/3600.
-        return decimal_degree
+        sign = math.copysign(1, degree)
+        decimal_degree = abs(degree) + abs(minute/60) + abs(second/3600)
+        return sign * decimal_degree
 
     @staticmethod
-    def _calc_degree_minute(degree, minute, second):
+    def _calc_decimal_minute(degree, minute, second):
         """
         Convert latitude/longitude with the entry format
         (degress, minutes, seconds) to degree minutes. Degree minutes are
@@ -189,7 +193,7 @@ class APRSCoordinate(object):
         -------
         (degree, decimal_minutes) : (tuple) coordinate in degrees minutes
         """
-        return (degree, minute + second/60)
+        return (degree, abs(minute) + abs(second/60))
 
     @staticmethod
     def _calc_degree_minute_second(decimal_degree):
@@ -200,11 +204,71 @@ class APRSCoordinate(object):
         outputs
         --------
         degree, minute, second : (float) coordinates"""
-        degree = math.floor(decimal_degree)
+
+        if decimal_degree < 0:
+            degree = math.ceil(decimal_degree)
+        else:
+            degree = math.floor(decimal_degree)
         minute = decimal_degree % 1 * 60
         second = minute % 1 * 60
+        return (degree, math.floor(minute), round(second))
 
-        return (math.floor(decimal_degree), math.floor(minute), round(second))
+    @abc.abstractmethod
+    def get_hemisphere(self):
+        return
+
+
+    def to_string(self, format_str):
+        """
+        Output coordinate in formatted string
+        inputs
+        -------
+        format_str : (str) A string of the form A%B%C where A, B and C are
+        identifiers.
+        'H' - Hemisphere designation (E/W for longitude, N/S for latitude)
+        'M' - decimal minute
+        'm' - minute
+        'd' - degree
+        'D' - decimal degree
+        'S' - second
+
+        Unknown identifiers (e.g. [' ', ',', '-', '_', ', ']) will be inserted as
+        separators in a position corresponding to the position in format.
+        Examples:
+        """
+        reg = '[ ,_-]'
+        rege = re.compile(reg)
+        format2value = {'H': self.get_hemisphere(),
+                        'M': abs(self.decimal_minute),
+                        'm': abs(self.minute),
+                        'd': self.degree,
+                        'D': self.decimal_degree,
+                        'S': abs(self.second)}
+        format_elements = format_str.split('%')
+
+        coord_list = []
+        for element in format_elements:
+            res = rege.search(element)
+
+            new_element = rege.sub('', element)
+            value = str(format2value.get(new_element, new_element))
+            coord_list.append(value)
+
+            if res:
+                coord_list.append(element[res.start():res.end()])
+
+        # coord_list = [str(format2value.get(element, element)) for element in format_elements]
+        coord_str = ''.join(coord_list)
+        if 'H' in format_elements: # No negative values when hemispheres are indicated
+            coord_str = coord_str.replace('-', '')
+        return coord_str
+
+    def _update(self, degree, minute, second):
+        self.decimal_minute = self.\
+            _calc_decimal_minute(degree, minute, second)
+        self.decimal_degree = self.\
+            _calc_decimaldegree(degree, minute, second)
+        return
 
     def __neg__(self):
         return APRSCoordinate(-self.decimal_degree)
@@ -256,60 +320,82 @@ class APRSCoordinate(object):
         return str(self.decimal_degree)
 
     def __repr__(self):
-        return self.__str__()
+        return "APRSCoordinate({})".format(self.decimal_degree)
 
-class GeoTest(unittest.TestCase):
 
-    def setUp(self):
-        global aprs, latitude, longitude, lat_dd, lat_dm
-        latitude =  (12, 34, 56)
-        lat_dd = 12.582222222222223
-        lat_dm = 34.933333333333
-        longitude = (16, 25, 34)
-        aprs = APRSCoordinate(*latitude)
+
+class Latitude(APRSCoordinate):
+    """Latidude Coordinates"""
+
+    def get_hemisphere(self):
+        '''
+        Returns the hemisphere identifier for the current coordinate
+        '''
+        if self.decimal_degree < 0: return 'S'
+        else: return 'N'
+
+    def set_hemisphere(self, hemi_str):
+        """Given a hemisphere identifier, set the sign of the coordinate to
+        match that hemisphere"""
+        if hemi_str == 'S':
+            self.degree = abs(self.degree)*-1
+            self.minute = abs(self.minute)
+            self.second = abs(self.second)
+            self._update(self.degree, self.minute, self.second)
+        elif hemi_str == 'N':
+            self.degree = abs(self.degree)
+            self.minute = abs(self.minute)
+            self.second = abs(self.second)
+            self._update(self.degree, self.minute, self.second)
+        else:
+            raise ValueError("Hemisphere must be one of ('N','S')")
         return
 
-    def test_decimaldegree(self):
-        decimal_degree = APRSCoordinate._calc_decimaldegree(*latitude)
-        print(decimal_degree)
-        self.assertAlmostEqual(decimal_degree, 12.5822, places=4)
+    def __repr__(self):
+        return "Latitude({})".format(self.decimal_degree)
+
+
+
+class Longitude(APRSCoordinate):
+    """
+    Coordinate object specific for longitude coordinates
+    Langitudes outside the range -180 to 180
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(Longitude, self).__init__(*args, **kwargs)
+
+    def get_hemisphere(self):
+        '''
+        Returns the hemisphere identifier for the current coordinate
+        '''
+        if self.decimal_degree < 0: return 'W'
+        else: return 'E'
+
+    def set_hemisphere(self, hemi_str):
+        '''
+        Given a hemisphere identifier, set the sign of the coordinate to match that hemisphere
+        '''
+        if hemi_str == 'W':
+            self.degree = abs(self.degree)*-1
+            self.minute = abs(self.minute)
+            self.second = abs(self.second)
+            self._update(self.degree, self.minute, self.second)
+        elif hemi_str == 'E':
+            self.degree = abs(self.degree)
+            self.minute = abs(self.minute)
+            self.second = abs(self.second)
+            self._update(self.degree, self.minute, self.second)
+        else:
+            raise(ValueError, "Hemisphere must be one of ('E','W')")
         return
 
-    def test_ARPSCoordinate_init(self):
-
-        # Args method
-        _aprs = APRSCoordinate(*latitude)
-        self.assertIsInstance(_aprs, APRSCoordinate)
-        self.assertEqual(_aprs.degree, latitude[0])
-        self.assertEqual(_aprs.minute, latitude[1])
-        self.assertEqual(_aprs.second, latitude[2])
-        self.assertAlmostEqual(_aprs.decimal_degree, lat_dd, places=4)
-
-        # Kwargs method
-        coord = {'degree':latitude[0],'minute':latitude[1],'second':latitude[2]}
-        _aprs = APRSCoordinate(**coord)
-        self.assertIsInstance(_aprs, APRSCoordinate)
-        self.assertEqual(_aprs.degree, latitude[0])
-        self.assertEqual(_aprs.minute, latitude[1])
-        self.assertEqual(_aprs.second, latitude[2])
-        self.assertAlmostEqual(_aprs.decimal_degree, lat_dd, places=4)
-
-        # Decimal degree method
-        _aprs = APRSCoordinate(12.582222222)
-        self.assertIsInstance(_aprs, APRSCoordinate)
-        self.assertEqual(_aprs.degree, latitude[0])
-        self.assertEqual(_aprs.minute, latitude[1])
-        self.assertEqual(_aprs.second, latitude[2])
-        self.assertAlmostEqual(_aprs.decimal_degree, lat_dd, places=4)
-
-        return
+    def __repr__(self):
+        return "Longitude({})".format(self.decimal_degree)
 
 
 
 
-
-if __name__ == '__main__':
-    unittest.main(GeoTest())
 
 
 

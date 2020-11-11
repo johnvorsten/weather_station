@@ -5,4 +5,5 @@
 # Environment files
 *.env
 
-
+# Drawio
+requests_flow.drawio
