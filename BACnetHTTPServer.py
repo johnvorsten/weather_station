@@ -648,10 +648,12 @@ def main(child_thread=False):
         parser.add_argument("--host", type=str, help="server host", default=HOST)
         # add an option for the server port
         parser.add_argument("--port", type=int, help="server port", default=PORT)
-        args = parser.parse_args()
-        # Adding arguments to the argument parser (Not used)
-        # config_path = r"C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\bacnet_client.ini"
-        # args = parser.parse_args(['--ini', config_path])
+        try:
+            args = parser.parse_args()
+        except RuntimeError:
+            # Adding arguments to the argument parser
+            config_path = r"./bacnet_client.ini"
+            args = parser.parse_args(['--ini', config_path])
 
         if _debug:
             _log.debug("initialization")
@@ -686,6 +688,8 @@ def main(child_thread=False):
             bac_thread.daemon = False # Keep the thread open for interactive
             bac_thread.start()
         else:
+            # Start the BACnet thread in the main thread
+            # This blocks
             run()
 
     except Exception as err:
@@ -702,8 +706,6 @@ def main(child_thread=False):
             _log.debug("finally")
     return
 
-
-#%%
 
 if __name__ == '__main__':
     """Begin BACnet client when this script is run as a top-level scope

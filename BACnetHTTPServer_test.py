@@ -28,34 +28,41 @@ from bacpypes.object import get_object_class, get_datatype
 from bacpypes.local.device import LocalDeviceObject
 
 # Local imports
-from httpServer import HTTPRequestHandler, ThreadedTCPServer
-import httpServer
+from BACnetHTTPServer import HTTPRequestHandler, ThreadedTCPServer
+import BACnetHTTPServer
 
 # Globals & Declarations
 process_queue = Queue()
-ini_file = r"C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\bacnet_client.ini"
+ini_file = "./bacnet_client.ini"
 HOST, PORT = 'localhost','8083'
 BAC_SERVER_ADDRESS = '192.168.1.100'
 
 # Check if network interface is active
-import subprocess
-cmd = ['netsh','interface','show','interface']
-process = subprocess.run(cmd, stdout=subprocess.PIPE)
-"""
-'Admin State    State          Type             Interface Name',
- '-------------------------------------------------------------------------',
- 'Enabled        Connected      Dedicated        Wi-Fi'
- """
-ADAPTER_ENABLED = False
-ADAPTER_CONNECTED = False
-for line in process.stdout.decode().split('\r\n'):
-    if re.search('Ethernet', line):
-        if re.search('Enabled', line):
-            ADAPTER_ENABLED = True
-        if re.search('Connected', line):
-            ADAPTER_CONNECTED = True
+def _check_network_interface_windows(interface_name):
 
+    cmd = ['netsh','interface','show','interface']
+    process = subprocess.run(cmd, stdout=subprocess.PIPE)
+    """
+    'Admin State    State          Type             Interface Name',
+     '-------------------------------------------------------------------------',
+     'Enabled        Connected      Dedicated        Wi-Fi'
+     """
 
+    adapter_enabled = False
+    adapter_connected = False
+    for line in process.stdout.decode().split('\r\n'):
+        if re.search('Ethernet', line):
+            if re.search('Enabled', line):
+                adapter_enabled = True
+            if re.search('Connected', line):
+                adapter_connected = True
+
+    return adapter_enabled, adapter_connected
+
+ADAPTER_ENABLED, ADAPTER_CONNECTED = _check_network_interface_windows('Ethernet')
+if not ADAPTER_ENABLED and ADAPTER_CONNECTED:
+    msg="The netwok interface Ethernet is not enabled. Cannot run network tests"
+    raise RuntimeError(msg)
 
 #%%
 
@@ -91,7 +98,7 @@ class BacnetHTTPServerTest(unittest.TestCase):
 
         # Make a simple application
         this_application = BIPSimpleApplication(this_device, args.ini.address)
-        httpServer.this_application = this_application
+        BACnetHTTPServer.this_application = this_application
 
         # Start the BACnet application in a child thread
         # Child threads do not receive signals SIGTERM or SIGUSR1
@@ -270,8 +277,8 @@ if __name__ == '__main__':
     # suite = unittest.TestLoader().loadTestsFromTestCase(BacnetHTTPServerTest)
     # unittest.TextTestRunner(verbosity=2).run(suite)
 
-    # # Method 2 - Running a test case
-    # unittest.main(BacnetHTTPServerTest())
+    # Method 2 - Running a test case
+    unittest.main(BacnetHTTPServerTest())
 
     # Method 3 - Running a SINGLE test method from a test case
     suite = unittest.TestSuite()
@@ -361,26 +368,25 @@ class OfflineBacnetTest(unittest.TestCase):
         """Initialize the BACnet client application that is used to communicate
         on the network"""
 
-        global process, t
-        executable = r'C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\httpServer.py'
+        global process, enqueue_thread
+        executable = r'./BACnetHTTPServer.py'
         args = ['python', executable,
                 '--ini', ini_file,
                 '--host', HOST,
                 '--port', PORT,
                 '--debug', '__main__.ThreadedHTTPRequestHandler',
-                '--debug','__main__',
                 ]
         process = subprocess.Popen(args,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         # Give time for process to start up
         time.sleep(3)
-        t = threading.Thread(target=enqueue_output, args=(process.stdout, process_queue))
-        t.daemon = True # thread dies with the program
-        t.start()
-        print("Read thread is alive : ", t.is_alive())
+        enqueue_thread = threading.Thread(target=enqueue_output, args=(process.stdout, process_queue))
+        enqueue_thread.daemon = True # thread dies with the program
+        enqueue_thread.start()
+        print("Read thread is alive : ", enqueue_thread.is_alive())
 
-        return
+        return None
 
 
     def close_bacnet_client(self):

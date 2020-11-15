@@ -7,6 +7,7 @@ Created on Sun Nov  1 13:39:53 2020
 
 # Python imports
 import asyncio
+import socket
 
 # Third party imports
 
@@ -17,11 +18,12 @@ from CWOPpdu import CWOPPDU
 # Declarations
 SERVER_HOST = 'cwop.aprs.net'
 SERVER_PORT = 14580
-_debug = True
+_debug = False
 pdu = False # No default for sending message
 
+#%%
 
-async def tcp_echo_client(pdu, SERVER_HOST, SERVER_PORT):
+async def cwop_client(pdu, SERVER_HOST, SERVER_PORT):
     """
     Parameters
     ----------
@@ -60,27 +62,31 @@ async def tcp_echo_client(pdu, SERVER_HOST, SERVER_PORT):
         SERVER_HOST, SERVER_PORT)
 
     # 1. Receive connection line
+    """
+    # This actually isnt needed, even thought the CWOP spec acts like it is...
     soo1 = await reader.read(-1)
     if _debug:
         print('Client Received {}\n'.format(soo1))
+    """
 
     # 2. Send login line
     if _debug:
         print('Client sending login line {}\n'.format(pdu.login_line))
-    writer.write(pdu.login_line) # Bytes
-    writer.write(b'\r\n')
+    writer.write(pdu.login_line + b'\n') # Bytes
     await writer.drain()
 
     # 3. Receive acknowledgement
+    """
+    # This is also not needed (and actually breaks the program)
     soo3 = await reader.read(-1)
     if _debug:
         print('Client Received Acknowledgement {}\n'.format(soo3))
+    """
 
     # 4. Send APRS packet
     if _debug:
         print('Client Sending data {}\n'.format(pdu.pdu_data_packet))
-    writer.write(pdu.pdu_data_packet)
-    writer.write(b'\r\n')
+    writer.write(pdu.pdu_data_packet + b'\n')
     await writer.drain()
     writer.close()
     await writer.wait_closed()
@@ -88,8 +94,28 @@ async def tcp_echo_client(pdu, SERVER_HOST, SERVER_PORT):
     return
 
 
+def _standard_socket():
+    """Dont use this method, even though it works to send data through a
+    standard socket"""
+
+    SERVER_HOST = 'cwop.aprs.net'
+    SERVER_PORT = 14580
+    data_packet = b'FW8400>APRS,TCPIP*:@110649z2945.13N/09532.50W_.../...g...t...r...p...P...b...h...'
+    login_line = b'user FW8400 pass -1 vers PythonCWOP 1.0'
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((SERVER_HOST, SERVER_PORT))
+    # Login
+    s.send(login_line + b'\n')
+    s.send(data_packet + b'\n')
+    s.shutdown(0)
+    s.close()
+
+    return
+
+
 async def main(pdu):
-    await tcp_echo_client(pdu, SERVER_HOST, SERVER_PORT)
+    await cwop_client(pdu, SERVER_HOST, SERVER_PORT)
     return
 
 
@@ -104,7 +130,7 @@ if __name__ == '__main__':
         # AKA working in ipython
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            client_coroutine = tcp_echo_client(pdu, SERVER_HOST, SERVER_PORT)
+            client_coroutine = cwop_client(pdu, SERVER_HOST, SERVER_PORT)
             client_task = asyncio.create_task(client_coroutine)
 
         else:
