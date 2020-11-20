@@ -407,6 +407,8 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                    'Must include specifiers like {"object":"analogValue:1",' +
                    '"property":"presentValue"}'
                    )
+            if _debug:
+                HTTPRequestHandler._debug("    - body_json: %r", msg)
             self.send_header('Content-Type','text/plain')
             self.end_headers()
             self.wfile.write(bytes(msg, 'utf-8'))
@@ -417,6 +419,8 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
             msg = ('Bad request format. "bacnet_objects" must be a key '+
                    'in the request body JSON oject. Got {}'.format(str(body_json.keys()))
                    )
+            if _debug:
+                HTTPRequestHandler._debug("    - body_json: %r", msg)
             self.send_header('Content-Type','text/plain')
             self.end_headers()
             self.wfile.write(bytes(msg, 'utf-8'))
@@ -444,6 +448,10 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                     msg = ('The requested Object Identifier is not a valid BACnet '+
                            'object type. Got {}'.format(str(obj_id))
                            )
+                    if _debug:
+                        HTTPRequestHandler._debug("    - obj_id: %r", msg)
+                    self.send_header('Content-Type','text/plain')
+                    self.end_headers()
                     self.wfile.write(bytes(msg, 'utf-8'))
                     raise ValueError(msg)
             except ValueError:
@@ -451,6 +459,8 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                 msg = ('The requested Object Identifier is not a valid BACnet '+
                        'object type. Got {}'.format(str(obj_id))
                        )
+                if _debug:
+                    HTTPRequestHandler._debug("    - objectID: %r", msg)
                 self.send_header('Content-Type','text/plain')
                 self.end_headers()
                 self.wfile.write(bytes(msg, 'utf-8'))
@@ -463,6 +473,8 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                 msg = ('Invalid BACnet property. Valid propery must be one of '+
                        '{}'.format(str(PropertyIdentifier.enumerations.keys()))
                        )
+                if _debug:
+                    HTTPRequestHandler._debug("    - bac property: %r", msg)
                 self.send_header('Content-Type','text/plain')
                 self.end_headers()
                 self.wfile.write(bytes(msg, 'utf-8'))
@@ -475,6 +487,8 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                 msg = ('Invalid combination of BACnet object type and property ID '+
                        'Got {}, {}'.format(str(obj_id), str(prop_id))
                        )
+                if _debug:
+                    HTTPRequestHandler._debug("    - datatype: %r", msg)
                 self.send_header('Content-Type','text/plain')
                 self.end_headers()
                 self.wfile.write(bytes(msg, 'utf-8'))
@@ -503,7 +517,6 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 
 
     def do_ReadPropertyMultiple(self, args, body_json):
-        global apdu
         """
         Example Read
         http://localhost/read/adderss/analogValue:1
@@ -515,22 +528,29 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
         http://localhost/whois/<address>
 
         Example ReadPropertyMultiple
-        http://localhost:8081/readpropertymultiple/<address>/
+        http://localhost:8081/readpropertymultiple/
 
-        args = {'address':'192.168.1.100',
-                'bacnet_objects': [{'object': 'analogValue:1',
-                                    'property': 'presentValue'},
-                                   {'object': 'analogValue:2',
-                                    'property': 'presentValue'},
-                                   {'object': 'analogValue:3',
-                                    'property': 'presentValue'}]}
+        args = {'bacnet_objects': [{'object': 'analogInput:1', 'property': 'presentValue'},
+                                   {'object': 'analogInput:4', 'property': 'presentValue'},
+                                   {'object': 'analogInput:8', 'property': 'presentValue'},
+                                   {'object': 'analogInput:12', 'property': 'presentValue'}],
+                'address': '665002'}
+        headers = {'Content-Type':'application/json'}
+        res = requests.post(url, headers=headers,
+                            data=json.dumps(body),
+                            timeout=2)
         """
         # Init results JSON
         results = {}
         try:
             request = self._form_ReadPropertyMultiple_request(args, body_json)
-        except ValueError:
-            # Headers are already written
+        except ValueError as e:
+            # Headers were already written
+            if _debug:
+                HTTPRequestHandler._debug("    - request: %r", str(e))
+            self.send_header('Content-Type','text/plain')
+            self.end_headers()
+            self.wfile.write(str(e))
             self.wfile.write(b'End of response')
             return
 

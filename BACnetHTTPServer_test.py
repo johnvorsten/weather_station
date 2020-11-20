@@ -229,8 +229,7 @@ class BacnetHTTPServerTest(unittest.TestCase):
     def test_ReadPropertyMultiple(self):
 
         url = 'http://{}:{}/readpropertymultiple/'.format(HOST, PORT)
-        headers = {'Content-Type':'application/json',
-                   }
+        headers = {'Content-Type':'application/json'}
         bacnet_object1 = {'object':'analogValue:10000',
                           'property':'presentValue'}
         bacnet_object2 = {'object':'analogValue:10001',
@@ -249,6 +248,25 @@ class BacnetHTTPServerTest(unittest.TestCase):
 
         return
 
+    def test_ReadPropertyMultiple_routed(self):
+
+        url = 'http://{}:{}/readpropertymultiple/'.format(HOST, PORT)
+        headers = {'Content-Type':'application/json'}
+        bacnet_object1 = {'object': 'analogInput:1', 'property': 'presentValue'}
+        bacnet_object2 = {'object': 'analogInput:4', 'property': 'presentValue'}
+        bacnet_object3 = {'object': 'analogInput:8', 'property': 'presentValue'}
+        bacnet_object4 = {'object': 'analogInput:12', 'property': 'presentValue'}
+        body = {'bacnet_objects':[bacnet_object1, bacnet_object2, bacnet_object3, bacnet_object4],
+                'address':'101:2'}
+
+        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=2)
+
+        self.assertEqual(res.status_code, 202)
+        self.assertTrue("('analogValue', 10000)" in res.json().keys())
+        self.assertTrue("('analogValue', 10001)" in res.json().keys())
+        self.assertTrue("('analogValue', 10002)" in res.json().keys())
+
+        return
 
     def test_invalid_bacnet_object(self):
         return

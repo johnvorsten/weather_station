@@ -1,0 +1,48 @@
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Debug message
+INFO:__main__:Info message
+WARNING:__main__:Warning message
+ERROR:__main__:error message
+CRITICAL:__main__:Critical message
+ERROR:__main__:Custom Value Error
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 118, in <module>
+    raise(ValueError("Custom Value Error"))
+ValueError: Custom Value Error
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Debug message
+2020-11-19 14:52:50,058 __main__ - INFO -Info message
+INFO:__main__:Info message
+2020-11-19 14:53:42,670 __main__ - WARNING -Warning message
+WARNING:__main__:Warning message
+2020-11-19 15:07:58,319 __main__ - WARNING -Warning message
+2020-11-19 15:08:02,296 __main__ - ERROR -error message
+2020-11-19 15:11:57,470 __main__ - WARNING -Warning message
+2020-11-19 15:12:04,883 __main__ - ERROR -Error message
+2020-11-19 15:15:37,827 __main__ - ERROR -Error message
+2020-11-19 15:24:53,142 __main__ - INFO -Info message
+2020-11-19 15:24:54,947 __main__ - WARNING -Warning message
+2020-11-19 15:24:56,399 __main__ - ERROR -Error message
+2020-11-19 21:27:14,433 __main__ - INFO -Info message
+2020-11-19 21:27:14,433 __main__ - INFO -Info message
+2020-11-19 21:27:14,436 __main__ - WARNING -Warning message
+2020-11-19 21:27:14,436 __main__ - WARNING -Warning message
+2020-11-19 21:27:14,439 __main__ - ERROR -Error message
+2020-11-19 21:27:14,439 __main__ - ERROR -Error message
+2020-11-19 21:27:16,146 __main__ - CRITICAL -Critical message
+2020-11-19 21:27:16,146 __main__ - CRITICAL -Critical message
+2020-11-19 21:27:17,551 __main__ - ERROR -Custom Value Error
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 114, in <module>
+    raise(ValueError("Custom Value Error"))
+ValueError: Custom Value Error
+2020-11-19 21:27:17,551 __main__ - ERROR -Custom Value Error
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 114, in <module>
+    raise(ValueError("Custom Value Error"))
+ValueError: Custom Value Error
+2020-11-19 21:27:21,436 __main__ - WARNING -HTTPConnectionPool(host='localhost', port=8081): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000001F0F1D10188>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
+2020-11-19 21:27:21,436 __main__ - WARNING -HTTPConnectionPool(host='localhost', port=8081): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000001F0F1D10188>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
