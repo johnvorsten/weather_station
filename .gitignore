@@ -10,3 +10,6 @@ requests_flow.drawio
 
 # Personal configuration
 weather_config.ini
+
+# Log files
+CWOPWeatherPy.log
