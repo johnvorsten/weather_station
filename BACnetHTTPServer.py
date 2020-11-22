@@ -45,8 +45,13 @@ _debug = True
 _log = ModuleLogger(globals())
 
 # settings
-HOST = 'localhost'
-PORT = int(os.getenv("PORT", 8080))
+# parse the command line arguments
+parser = ConfigArgumentParser(description=__doc__)
+# add an option for the server host
+parser.add_argument("--host", type=str, help="server host")
+# add an option for the server port
+parser.add_argument("--port", type=int, help="server port")
+DEFAULT_CONFIG_PATH = r"./weather_config.ini"
 
 # reference a simple application
 this_application = None
@@ -54,7 +59,6 @@ server = None
 
 # TODO
 # Cache control heder?
-# Get or post request for read property multiple?
 
 # favorite icon
 favicon = zlib.decompress(
@@ -628,8 +632,16 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                     results[str(objectIdentifier)][str(propertyIdentifier)] = value
         else:
             # Error
-            msg = ('Received improper BACnet response {}'.format(str(iocb))
-                   )
+            msg = ('Received improper BACnet response \n' +
+                   'args : {}\n' +
+                   'kwargs : {}\n' +
+                   'ioState : {}\n' +
+                   'ioComplete : {}\n' +
+                   'ioCallback : {}\n' +
+                   'ioResponse : {}')
+            msg = msg.format(iocb.args, iocb.kwargs,
+                             iocb.ioState, iocb.ioComplete,
+                             iocb.ioCallback, iocb.ioResponse)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(bytes(msg, 'utf-8'))
@@ -642,9 +654,12 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
             # Cannot serialize value of results
             msg = bytes(json.dumps(results, default=lambda o: str(o)), 'utf-8')
 
+        if _debug:
+            HTTPRequestHandler._debug("    - response: %r", str(msg))
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(msg)
+
         return
 
 
@@ -662,18 +677,12 @@ def main(child_thread=False):
     global this_application, server, server_thread, bac_thread
 
     try:
-        # parse the command line arguments
-        parser = ConfigArgumentParser(description=__doc__)
-        # add an option for the server host
-        parser.add_argument("--host", type=str, help="server host", default=HOST)
-        # add an option for the server port
-        parser.add_argument("--port", type=int, help="server port", default=PORT)
-        try:
-            args = parser.parse_args()
-        except RuntimeError:
-            # Adding arguments to the argument parser
-            config_path = r"./bacnet_client.ini"
-            args = parser.parse_args(['--ini', config_path])
+
+        # Parse command line arguments with ini file configuration
+        # This Parser expects the default ini file path of ./BACpypes.ini
+        # With a BACpypes section. If ./BACpypes.ini does not exist then pass
+        # a different file under --ini
+        args = parser.parse_args()
 
         if _debug:
             _log.debug("initialization")
@@ -688,7 +697,8 @@ def main(child_thread=False):
         # local host, special port
         server = ThreadedTCPServer((args.host, args.port), HTTPRequestHandler)
 
-        # Start a thread with the server -- that thread will then start a thread for each request
+        # Start a thread with the server -- that thread will then start a thread
+        # for each request
         server_thread = threading.Thread(target=server.serve_forever)
 
         # exit the server thread when the main thread terminates

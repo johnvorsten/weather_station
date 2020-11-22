@@ -34,7 +34,7 @@ import BACnetHTTPServer
 # Globals & Declarations
 process_queue = Queue()
 ini_file = "./bacnet_client.ini"
-HOST, PORT = 'localhost','8083'
+HOST, PORT = 'localhost','8081'
 BAC_SERVER_ADDRESS = '192.168.1.100'
 
 # Check if network interface is active
@@ -229,7 +229,7 @@ class BacnetHTTPServerTest(unittest.TestCase):
     def test_ReadPropertyMultiple(self):
 
         url = 'http://{}:{}/readpropertymultiple/'.format(HOST, PORT)
-        headers = {'Content-Type':'application/json'}
+        headers = {'Content-Type':'application/json', 'X-bacnet-timeout':'3'}
         bacnet_object1 = {'object':'analogValue:10000',
                           'property':'presentValue'}
         bacnet_object2 = {'object':'analogValue:10001',
@@ -239,7 +239,7 @@ class BacnetHTTPServerTest(unittest.TestCase):
         body = {'bacnet_objects':[bacnet_object1, bacnet_object2, bacnet_object3],
                 'address':'192.168.1.100'}
 
-        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=2)
+        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=4)
 
         self.assertEqual(res.status_code, 202)
         self.assertTrue("('analogValue', 10000)" in res.json().keys())
@@ -251,7 +251,7 @@ class BacnetHTTPServerTest(unittest.TestCase):
     def test_ReadPropertyMultiple_routed(self):
 
         url = 'http://{}:{}/readpropertymultiple/'.format(HOST, PORT)
-        headers = {'Content-Type':'application/json'}
+        headers = {'Content-Type':'application/json', 'X-bacnet-timeout':'8'}
         bacnet_object1 = {'object': 'analogInput:1', 'property': 'presentValue'}
         bacnet_object2 = {'object': 'analogInput:4', 'property': 'presentValue'}
         bacnet_object3 = {'object': 'analogInput:8', 'property': 'presentValue'}
@@ -259,12 +259,13 @@ class BacnetHTTPServerTest(unittest.TestCase):
         body = {'bacnet_objects':[bacnet_object1, bacnet_object2, bacnet_object3, bacnet_object4],
                 'address':'101:2'}
 
-        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=2)
+        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=10)
 
         self.assertEqual(res.status_code, 202)
-        self.assertTrue("('analogValue', 10000)" in res.json().keys())
-        self.assertTrue("('analogValue', 10001)" in res.json().keys())
-        self.assertTrue("('analogValue', 10002)" in res.json().keys())
+        self.assertTrue("('analogInput', 1)" in res.json().keys())
+        self.assertTrue("('analogInput', 4)" in res.json().keys())
+        self.assertTrue("('analogInput', 8)" in res.json().keys())
+        self.assertTrue("('analogInput', 12)" in res.json().keys())
 
         return
 

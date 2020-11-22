@@ -65,7 +65,7 @@ def _check_network_interface_windows(interface_name):
     return adapter_enabled, adapter_connected
 
 
-def read_bacnet_client_ini(config):
+def read_bacnet_server_ini(config):
     """
     bacnet_object1 = {'object':'analogValue:10000',
                       'property':'presentValue'}
@@ -179,6 +179,7 @@ def test_bacnet_server(BACHTTPServerHost, BACHTTPPort):
 
 
 class AsyncRecurringTimer:
+
     def __init__(self, call_period, callback, recurring=False):
         """
         Inputs
@@ -218,7 +219,7 @@ class AsyncRecurringTimer:
         self._task.cancel()
         return
 
-    async def start(self, *args, **kwargs):
+    def start(self, *args, **kwargs):
         """Return a coroutine to be scheduled by the main event loop
         This does not automatically start the coroutine. To start this timer
         pass it to the asyncio.main() function or create a task and schedule
@@ -241,6 +242,9 @@ class AsyncRecurringTimer:
             else:
                 pass"""
         return self._cycle(*args, **kwargs)
+
+    def is_task_running(self):
+        return not self._task.done()
 
 
 
@@ -317,4 +321,15 @@ class BufferedSMTPHandler(BufferingHandler):
         return self.subject
 
 
+    def close(self):
+        """
+        Close the handler.
+        This version only flushes the buffer if the buffer is half of capacity.
+        Finally, chain the parent class' close().
+        """
+        try:
+            if len(self.buffer) > self.capacity // 2:
+                self.flush()
+        finally:
+            logging.Handler.close(self)
 

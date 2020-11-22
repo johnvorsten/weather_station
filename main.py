@@ -2,7 +2,6 @@
 """
 Created on Thu Nov 12 21:07:15 2020
 
-TODO add logging
 TODO add supervisor
 
 @author: z003vrzk
@@ -22,7 +21,7 @@ from bacpypes.primitivedata import ObjectIdentifier
 # Local imports
 from CWOPpdu import CWOPPDU, Latitude, Longitude
 from CWOPClient import cwop_client
-from weather_utils import (check_network_interface, read_bacnet_client_ini,
+from weather_utils import (check_network_interface, read_bacnet_server_ini,
                            enqueue_output, read_process,
                            start_BACnet_HTTP_Server, close_BACnet_HTTP_Server,
                            test_bacnet_server, AsyncRecurringTimer,
@@ -33,12 +32,11 @@ config = ConfigParser()
 config_file = './weather_config.ini'
 config.read(config_file)
 sections = config.sections()
-assert 'bacnet_client' in sections, 'bacnet_client ini section is required'
+assert 'BACpypes' in sections, 'BACpypes ini section is required'
 assert 'bacnet_server' in sections, 'bacnet_server ini section is required'
 assert 'http_server' in sections, 'http_server ini section is required'
 assert 'cwop_client' in sections, 'cwop_client ini section is required'
 # BACnet HTTP Server and client declarations
-BAC_ini_file = './bacnet_client.ini'
 BACHTTPServerHost = config['http_server']['BACHTTPServerHost']
 BACHTTPPort = config['http_server']['BACHTTPPort']
 
@@ -51,7 +49,7 @@ longitude = float(config['cwop_client']['longitude'])
 call_period = int(config['cwop_client'].get('call_period', 5*60))
 
 # Check if network interface is active
-INTERFACE_NAME = 'Ethernet'
+INTERFACE_NAME = config['http_server']['adaptername']
 adapter_enabled, adapter_connected = check_network_interface(INTERFACE_NAME)
 if not adapter_enabled or not adapter_connected:
     msg='The specified network interface adapter is not connected'
@@ -100,13 +98,13 @@ logger.addHandler(ch) # Console / Stream
 logger.addHandler(fh) # File
 
 """
-X. Read configuration file for HTTP, BACnet client, BACnet Server
-X. Test the BACnet HTTP Server to see if it is up and connected
-X. Test the BACnet Client/server to see if it is running
-X. Test BACnet router to see if it is running
-X. Test BACnet weather client to see if it is connected
-X. Use a Try/Except to see if the internet connection was successful
-X. Send data to FindU Server
+1. Read configuration file for HTTP, BACnet client, BACnet Server
+2. Test the BACnet HTTP Server to see if it is up and connected
+3. Begin the recurring task
+    1. Read weather information from BACnet server through the HTTP API
+    2. Error check HTTP Client/Server API response
+    3. Form CWOP Protocol data unit
+    4. Send data to FindU Server
 """
 
 #%%
@@ -114,31 +112,34 @@ X. Send data to FindU Server
 
 async def main():
     """
-    X. Request data from BACnet server
-    X. Error check HTTP Client/Server API response
-    X. Form CWOP Protocol data unit
-    X. Send data to FindU Server
+    1. Read weather information from BACnet server through the HTTP API
+    2. Error check HTTP Client/Server API response
+    3. Form CWOP Protocol data unit
+    4. Send data to FindU Server
     """
 
-    # X. Read weather information from BACnet server through the HTTP
+    # 1. Read weather information from BACnet server through the HTTP
     # API
     url = 'http://{}:{}/readpropertymultiple/'.format(BACHTTPServerHost, BACHTTPPort)
     headers = {'Content-Type':'application/json', 'X-bacnet-timeout':'3'}
     try:
-        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=2)
+        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=5)
     except Exception as e:
         msg='HTTP POST unsuccessful\n' + str(res.status_code) + str(res.request)
         logger.error(str(e) + '\n' + msg)
 
+    # 2. Error check HTTP Client/Server API response
     if res.headers['Content-Type'] != 'application/json':
         # An error was reported by the BACnet/HTTP server
         # Errors are reported with Content-Type = text/plain
         msg=('Error at BACnet HTTP Server. Content dump: {}'.format(res.content))
         logger.error(msg)
+        return
 
     if res.status_code != 202:
         msg=('Error at BACnet HTTP Server. Content dump: {}'.format(res.content))
         logger.warning(msg)
+        return
 
     try:
         # Parse the resposne (Should be JSON)
@@ -158,8 +159,10 @@ async def main():
              'the request.\nRequest : {}\nResponse : {}\n'\
                  .format(res.request, res.content))
         logger.error(e)
+        return
 
-    # X. Send data to FindU Server
+    # 3. Form CWOP Protocol data unit
+    # 4. Send data to FindU Server
     try:
         pdu_kwargs = {'time':datetime.now().strftime('%d%H%M'),
                       'latitude':Latitude(latitude),
@@ -169,10 +172,12 @@ async def main():
                       'dewpoint':res_json["('analogInput', 8)"]['presentValue'],
                       'co2':res_json["('analogInput', 12)"]['presentValue'],
                       }
-        pdu = CWOPPDU(**pdu_kwargs)
+        pdu = CWOPPDU(provider_id=provider_id, **pdu_kwargs)
         await cwop_client(pdu, CWOP_SERVER_HOST, CWOP_SERVER_PORT)
     except Exception as e:
         logger.exception(str(e))
+
+    logger.info('PDU Sent')
 
     return None
 
@@ -180,7 +185,7 @@ async def main():
 
 if __name__ == '__main__':
     global body
-    # X. Read configuration file for HTTP, BACnet client, BACnet Server
+    # 1. Read configuration file for HTTP, BACnet client, BACnet Server
     # Read the ini file and create the POST request body
     """Example Body
     {'bacnet_objects': [{'object': 'analogInput:1', 'property': 'presentValue'},
@@ -191,10 +196,10 @@ if __name__ == '__main__':
     """
     logger.debug("Starting Main")
     logger.debug("Reading ini configuration file")
-    body = read_bacnet_client_ini(config)
+    body = read_bacnet_server_ini(config)
     logger.debug("Configuration Options : {}".format(body))
 
-    # X. Test the BACnet HTTP Server to see if it is up and connected
+    # 2. Test the BACnet HTTP Server to see if it is up and connected
     try:
         res = test_bacnet_server(BACHTTPServerHost, BACHTTPPort)
         if res: # Boolean
@@ -209,7 +214,7 @@ if __name__ == '__main__':
         logger.warning(e)
         raise e
 
-    # X. Begin the recurring task
+    # 3. Begin the recurring task
     logger.info("Starting main loop. The CWOP Client loop will run " +
                 "continuously every {} seconds.".format(call_period))
     recurring_timer = AsyncRecurringTimer(call_period, main, recurring=True)
