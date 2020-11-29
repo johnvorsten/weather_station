@@ -36,11 +36,11 @@ fi
 
 ### Create virtual env ###
 if [ -d "$HOME/.virtualenvs/weather_station" ]; then
-	echo "Virtual environment already exists at $HOME/.virtualenvs/weather_station"
+	echo "Virtual environment already exists at $HOME/.virtualenvs/weather_station"
 else
-	virtualenv -p python3.8 "$HOME/.virtualenvs/weather_station"
+	virtualenv -p python3.8 "$HOME/.virtualenvs/weather_station"
 fi
-source "$HOME/.virtualenvs/weather_station/bin/activate"
+source "$HOME/.virtualenvs/weather_station/bin/activate"
 
 ### Install python packages ###
 pip install -r "$HOME/weather_station/requirements.txt"
@@ -48,6 +48,7 @@ pip install -r "$HOME/weather_station/requirements.txt"
 ### Startup Supervisor ###
 # Change log file ownership
 chown -R $USER /var/log/supervisor
+chown $USER /var/run/supervisor.sock
 if [ -a /var/run/supervisor.sock ]; then
 	echo "Unlinking socket file"
 	chown $USER /var/run/supervisor.sock
