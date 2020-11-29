@@ -1,8 +1,9 @@
 #!/bin/bash
 
 ### Create virtual env ###
-if apt list virtualenv; then
-	echo "Virtualenv alraedy installed"
+installed_check=$(command -v apt list virtualenv)
+if installed_check; then
+    echo "Virtualenv is already installed";
 else
 	apt install -y virtualenv
 fi
@@ -34,7 +35,3 @@ source "$HOME/.virtualenvs/weather_station/bin/activate"
 
 ### Install python packages ###
 pip install -r "$HOME/weather_station/requirements.txt"
-
-if apt list virtualenv; then
-    echo "Virtualenv is already installed";
-fi
