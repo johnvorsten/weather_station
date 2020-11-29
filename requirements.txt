@@ -9,8 +9,6 @@ colorama==0.4.3
 cryptography==3.2.1
 decorator==4.4.2
 idna==2.10
-ipykernel==5.3.4
-ipython==7.19.0
 ipython-genutils==0.2.0
 jedi==0.17.2
 jupyter-client==6.1.6
@@ -24,7 +22,6 @@ Pygments==2.7.1
 pyOpenSSL==19.1.0
 PySocks==1.7.1
 python-dateutil==2.8.1
-pywin32==227
 pyzmq==19.0.2
 requests==2.24.0
 setuptools==50.3.1.post20201107
