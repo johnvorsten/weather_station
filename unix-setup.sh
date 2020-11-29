@@ -2,7 +2,7 @@
 
 ### Install Dependencies ###
 installed_check=$(command -v virtualenv)
-if $installed_check; then
+if [ -n $installed_check ]; then
     echo "Virtualenv is already installed"
 else
 	apt install -y virtualenv
