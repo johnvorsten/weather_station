@@ -16,14 +16,14 @@ else
 	# Build and install python 3.8.6 in subshell for directory change
 	(
 	apt update
-	apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libsqlite3-dev libreadline-dev libffi-dev curl libbz2-dev
+	apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libsqlite3-dev libreadline-dev libffi-dev libbz2-dev wget
 	cd /tmp/
 	wget -P /tmp/ https://www.python.org/ftp/python/3.8.6/Python-3.8.6.tar.xz
 	tar -xf /tmp/Python-3.8.6.tar.xz --directory=/tmp/
 	cd /tmp/Python-3.8.6
 	/tmp/Python-3.8.6/configure --enable-optimizations
 	# Makefile will be created in /tmp/Python-3.8.6
-	make -f /tmp/makefile -j 4
+	make -f /tmp/Python-3.8.6/Makefile -j 4
 	make altinstall
 	)
 	# Verify installation
