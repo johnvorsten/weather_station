@@ -35,7 +35,7 @@ else
 fi
 
 ### Create virtual env ###
-if [ -d "$HOME/.virtualenvs/weather_station" ]; then
+if [ -d "$HOME/.virtualenvs/weather_station" ]; then
 	echo "Virtual environment already exists at $HOME/.virtualenvs/weather_station"
 else
 	virtualenv -p python3.8 "$HOME/.virtualenvs/weather_station"
