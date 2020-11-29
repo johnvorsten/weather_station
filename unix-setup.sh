@@ -7,7 +7,8 @@ else
 	apt install -y virtualenv
 fi
 
-if apt list python3.8; then
+installed_check=$(command -v python3.8)
+if installed_check; then
 	echo "Python 3.8 already installed"
 else
 	apt update
@@ -19,7 +20,7 @@ else
 	make -j 4
 	make altinstall
 	# Verify installation
-	if ! python3.8 --version; then
+	if ! command -v python3.8; then
 		echo "Python 3.8 was not installed"
 	fi
 fi
