@@ -8,21 +8,28 @@ else
 	apt install -y virtualenv
 fi
 
+# Check if Python 3.8.6 is installed
 installed_check=$(command -v python3.8)
 if installed_check; then
 	echo "Python 3.8 already installed"
 else
+	# Build and install python 3.8.6 in subshell for directory change
+	(
 	apt update
-	apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3=dev libssl-dev libsqlite3-dev libreadline-dev libffi-dev curl libbz2-dev
-	curl -O https://www.python.org/ftp/python/3.8.6/Python-3.8.6.tar.xz
-	tar -xf Python-3.8.6.tar.xz
-	cd Python-3.8.6
-	./configure --enable-optimizations
-	make -j 4
+	apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libsqlite3-dev libreadline-dev libffi-dev curl libbz2-dev
+	cd /tmp/
+	wget -P /tmp/ https://www.python.org/ftp/python/3.8.6/Python-3.8.6.tar.xz
+	tar -xf /tmp/Python-3.8.6.tar.xz --directory=/tmp/
+	cd /tmp/Python-3.8.6
+	/tmp/Python-3.8.6/configure --enable-optimizations
+	# Makefile will be created in /tmp/Python-3.8.6
+	make -f /tmp/makefile -j 4
 	make altinstall
+	)
 	# Verify installation
 	if ! command -v python3.8; then
 		echo "Python 3.8 was not installed"
+		exit 2
 	fi
 fi
 
