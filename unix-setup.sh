@@ -1,6 +1,6 @@
 #!/bin/bash
 
-### Create virtual env ###
+### Install Dependencies ###
 installed_check=$(command -v apt list virtualenv)
 if installed_check; then
     echo "Virtualenv is already installed";
@@ -26,6 +26,7 @@ else
 	fi
 fi
 
+### Create virtual env ###
 if [ -d "$HOME/.virtualenvs/weather_station" ]; then
 	echo "Virtual environment already exists at $HOME/.virtualenvs/weather_station"
 else
@@ -35,3 +36,12 @@ source "$HOME/.virtualenvs/weather_station/bin/activate"
 
 ### Install python packages ###
 pip install -r "$HOME/weather_station/requirements.txt"
+
+### Startup Supervisor ###
+cp "$HOME/weather_station/supervisor_weather.conf" "/etc/supervisor/conf.d"
+"$BINDIR/supervisord"
+# To restart supervisord
+# kill -HUP
+# Restart programs
+# supervsiorctl stop all
+# supervisorctl start all
