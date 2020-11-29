@@ -46,6 +46,13 @@ source "$HOME/.virtualenvs/weather_station/bin/activate"
 pip install -r "$HOME/weather_station/requirements.txt"
 
 ### Startup Supervisor ###
+# Change log file ownership
+chown -R $USER /var/log/supervisor
+if [ -a /var/run/supervisor.sock ]; then
+	echo "Unlinking socket file"
+	chown $USER /var/run/supervisor.sock
+	unlink /var/run/supervisor.sock
+fi
 cp "$HOME/weather_station/supervisor_weather.conf" "/etc/supervisor/conf.d"
 # supervisord
 # To restart supervisord
