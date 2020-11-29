@@ -2,7 +2,7 @@
 
 ### Install Dependencies ###
 installed_check=$(command -v apt list virtualenv)
-if installed_check; then
+if $installed_check; then
     echo "Virtualenv is already installed";
 else
 	apt install -y virtualenv
@@ -10,7 +10,7 @@ fi
 
 # Check if Python 3.8.6 is installed
 installed_check=$(command -v python3.8)
-if installed_check; then
+if $installed_check; then
 	echo "Python 3.8 already installed"
 else
 	# Build and install python 3.8.6 in subshell for directory change
