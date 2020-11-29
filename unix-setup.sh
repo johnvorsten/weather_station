@@ -1,16 +1,16 @@
 #!/bin/bash
 
 ### Install Dependencies ###
-installed_check=$(command -v apt list virtualenv)
+installed_check=$(command -v virtualenv)
 if $installed_check; then
-    echo "Virtualenv is already installed";
+    echo "Virtualenv is already installed"
 else
 	apt install -y virtualenv
 fi
 
 # Check if Python 3.8.6 is installed
 installed_check=$(command -v python3.8)
-if $installed_check; then
+if [ -n $installed_check ]; then
 	echo "Python 3.8 already installed"
 else
 	# Build and install python 3.8.6 in subshell for directory change
@@ -27,7 +27,8 @@ else
 	make altinstall
 	)
 	# Verify installation
-	if ! command -v python3.8; then
+	installed_check=$(command -v python3.8)
+	if [ -n $installed_check ]; then
 		echo "Python 3.8 was not installed"
 		exit 2
 	fi
@@ -37,7 +38,7 @@ fi
 if [ -d "$HOME/.virtualenvs/weather_station" ]; then
 	echo "Virtual environment already exists at $HOME/.virtualenvs/weather_station"
 else
-	virtualenv -p /usr/bin/python3.8 "$HOME/.virtualenvs/weather_station"
+	virtualenv -p python3.8 "$HOME/.virtualenvs/weather_station"
 fi
 source "$HOME/.virtualenvs/weather_station/bin/activate"
 
