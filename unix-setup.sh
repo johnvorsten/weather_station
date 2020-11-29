@@ -47,7 +47,7 @@ pip install -r "$HOME/weather_station/requirements.txt"
 
 ### Startup Supervisor ###
 cp "$HOME/weather_station/supervisor_weather.conf" "/etc/supervisor/conf.d"
-"$BINDIR/supervisord"
+supervisord
 # To restart supervisord
 # kill -HUP
 # Restart programs
