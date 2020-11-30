@@ -13,6 +13,7 @@ import time
 import threading
 from queue import Queue, Empty
 from logging.handlers import BufferingHandler
+import logging
 
 # Third party imports
 import requests
