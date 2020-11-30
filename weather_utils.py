@@ -7,7 +7,7 @@ Created on Thu Nov 12 21:16:10 2020
 # Python imports
 import re
 import subprocess
-import sys
+import sys, os
 import asyncio
 import time
 import threading
@@ -38,8 +38,7 @@ def check_network_interface(interface_name):
     if sys.platform == 'win32':
         adapter_enabled, adapter_connected = _check_network_interface_windows(interface_name)
     else:
-        msg='Network interface check only defined for windows platform'
-        raise NotImplementedError(msg)
+        adapter_enabled, adapter_connected = _check_network_interface_nix(interface_name)
 
     return adapter_enabled, adapter_connected
 
@@ -55,14 +54,40 @@ def _check_network_interface_windows(interface_name):
 
     adapter_enabled = False
     adapter_connected = False
-    for line in process.stdout.decode().split('\r\n'):
-        if re.search('Ethernet', line):
+    for line in process.stdout.decode().split(os.linesep):
+        if re.search(interface_name, line):
             if re.search('Enabled', line):
                 adapter_enabled = True
             if re.search('Connected', line):
                 adapter_connected = True
 
     return adapter_enabled, adapter_connected
+
+
+def _check_network_interface_nix(interface_name):
+
+    cmd = ['ip','link','show']
+    process = subprocess.run(cmd, stdout=subprocess.PIPE)
+    """
+    1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+        link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+        link/ether b8:27:eb:43:58:f9 brd ff:ff:ff:ff:ff:ff
+    3: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DORMANT group default qlen 1000
+        link/ether b8:27:eb:16:0d:ac brd ff:ff:ff:ff:ff:ff
+     """
+
+    adapter_enabled = False
+    adapter_connected = False
+    for line in process.stdout.decode().split(os.linesep):
+        if re.search(interface_name, line):
+            if re.search('state up', line, re.IGNORECASE):
+                # Assume the connector is enabled and connected if 'state' is true
+                adapter_enabled = True
+                adapter_connected = True
+
+    return adapter_enabled, adapter_connected
+
 
 
 def read_bacnet_server_ini(config):

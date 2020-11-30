@@ -92,7 +92,6 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
         http://localhost:8081/read/192.168.1.100/analogValue:0/presentValue"""
         if _debug:
             HTTPRequestHandler._debug("do_GET")
-        global favicon
 
         # get the thread
         cur_thread = threading.current_thread()
@@ -707,8 +706,8 @@ def main(child_thread=False):
 
         if _debug:
             _log.debug("running")
-            _log.debug("    - server_thread: %r", server_thread)
-            _log.debug("    - server: %r", server)
+            _log.debug("    - HTTP server_thread: %r", server_thread)
+            _log.debug("    - HTTP server: %r", server)
             _log.debug("    - this_device: %r", this_device)
 
         if child_thread==True:

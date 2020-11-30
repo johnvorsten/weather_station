@@ -10,6 +10,7 @@ TODO add supervisor
 # Python imports
 import asyncio
 from configparser import ConfigParser
+from argparse import ArgumentParser
 import json
 from datetime import datetime
 import logging
@@ -28,11 +29,16 @@ from weather_utils import (check_network_interface, read_bacnet_server_ini,
                            BufferedSMTPHandler)
 
 #### Declarations ####
+parser = ArgumentParser()
+parser.add_argument('--ini',
+                    type=str,
+                    help="CWOP Client Configuration File",
+                    required=True)
+args = parser.parse_args()
+config_file = args.ini
 config = ConfigParser()
-config_file = './weather_config.ini'
 config.read(config_file)
 sections = config.sections()
-assert 'BACpypes' in sections, 'BACpypes ini section is required'
 assert 'bacnet_server' in sections, 'bacnet_server ini section is required'
 assert 'http_server' in sections, 'http_server ini section is required'
 assert 'cwop_client' in sections, 'cwop_client ini section is required'
