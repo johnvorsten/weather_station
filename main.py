@@ -23,8 +23,6 @@ from bacpypes.primitivedata import ObjectIdentifier
 from CWOPpdu import CWOPPDU, Latitude, Longitude
 from CWOPClient import cwop_client
 from weather_utils import (check_network_interface, read_bacnet_server_ini,
-                           enqueue_output, read_process,
-                           start_BACnet_HTTP_Server, close_BACnet_HTTP_Server,
                            test_bacnet_server, AsyncRecurringTimer,
                            BufferedSMTPHandler)
 
@@ -207,6 +205,8 @@ if __name__ == '__main__':
 
     # 2. Test the BACnet HTTP Server to see if it is up and connected
     try:
+        logger.debug("Testing BACnet HTTP Server for connectivity")
+        logger.debug("BACnet HTTP Server Testing at {}:{}".format(BACHTTPServerHost, BACHTTPPort))
         res = test_bacnet_server(BACHTTPServerHost, BACHTTPPort)
         if res: # Boolean
             logger.info("BACnet HTTP Server is responding")
