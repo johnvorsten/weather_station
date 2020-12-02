@@ -133,3 +133,8 @@ TypeError: __init__() missing 1 required positional argument: 'provider_id'
 2020-11-30 20:27:41,182 __main__ - INFO -Calling main()
 2020-11-30 20:27:41,182 __main__ - INFO -Calling main()
 2020-11-30 20:27:41,182 __main__ - INFO -Calling main()
+2020-12-01 20:18:14,363 __main__ - INFO -Starting main loop. The loop will run continuously every 10 seconds.
+2020-12-01 20:18:14,364 __main__ - INFO -Starting new Async Event Loop
+2020-12-01 20:18:14,366 __main__ - INFO -Calling main()
+2020-12-01 20:18:24,368 __main__ - INFO -Calling main()
+2020-12-01 20:18:34,369 __main__ - INFO -Calling main()
