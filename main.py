@@ -33,6 +33,8 @@ parser.add_argument('--ini',
                     help="CWOP Client Configuration File",
                     required=True)
 args = parser.parse_args()
+# _DEFAULT_CONFIG_INI = "./weather_config.ini"
+# args = parser.parse_args(args=['--ini', _DEFAULT_CONFIG_INI])
 config_file = args.ini
 config = ConfigParser()
 config.read(config_file)

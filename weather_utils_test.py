@@ -151,11 +151,11 @@ loop = asyncio.new_event_loop()
 # Schedule a call to hello_world()
 loop.call_soon(hello_world)
 
-# Blocking call interrupted by loop.stop()
-try:
-    loop.run_forever()
-finally:
-    loop.close()
+# # Blocking call interrupted by loop.stop()
+# try:
+#     loop.run_forever()
+# finally:
+#     loop.close()
 
 
 #%%
@@ -176,6 +176,6 @@ async def loop_executer(loop):
         ]
         await asyncio.wait(tasks)
 
-ev_loop = asyncio.get_event_loop()
-task = ev_loop.create_task(loop_executer(ev_loop))
-ev_loop.run_forever()
+# ev_loop = asyncio.get_event_loop()
+# task = ev_loop.create_task(loop_executer(ev_loop))
+# ev_loop.run_forever()

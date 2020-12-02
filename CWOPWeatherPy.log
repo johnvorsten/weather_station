@@ -1,0 +1,145 @@
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Debug message
+INFO:__main__:Info message
+WARNING:__main__:Warning message
+ERROR:__main__:error message
+CRITICAL:__main__:Critical message
+ERROR:__main__:Custom Value Error
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 118, in <module>
+    raise(ValueError("Custom Value Error"))
+ValueError: Custom Value Error
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Starting Main
+DEBUG:__main__:Debug message
+2020-11-19 14:52:50,058 __main__ - INFO -Info message
+INFO:__main__:Info message
+2020-11-19 14:53:42,670 __main__ - WARNING -Warning message
+WARNING:__main__:Warning message
+2020-11-19 15:07:58,319 __main__ - WARNING -Warning message
+2020-11-19 15:08:02,296 __main__ - ERROR -error message
+2020-11-19 15:11:57,470 __main__ - WARNING -Warning message
+2020-11-19 15:12:04,883 __main__ - ERROR -Error message
+2020-11-19 15:15:37,827 __main__ - ERROR -Error message
+2020-11-19 15:24:53,142 __main__ - INFO -Info message
+2020-11-19 15:24:54,947 __main__ - WARNING -Warning message
+2020-11-19 15:24:56,399 __main__ - ERROR -Error message
+2020-11-19 21:27:14,433 __main__ - INFO -Info message
+2020-11-19 21:27:14,433 __main__ - INFO -Info message
+2020-11-19 21:27:14,436 __main__ - WARNING -Warning message
+2020-11-19 21:27:14,436 __main__ - WARNING -Warning message
+2020-11-19 21:27:14,439 __main__ - ERROR -Error message
+2020-11-19 21:27:14,439 __main__ - ERROR -Error message
+2020-11-19 21:27:16,146 __main__ - CRITICAL -Critical message
+2020-11-19 21:27:16,146 __main__ - CRITICAL -Critical message
+2020-11-19 21:27:17,551 __main__ - ERROR -Custom Value Error
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 114, in <module>
+    raise(ValueError("Custom Value Error"))
+ValueError: Custom Value Error
+2020-11-19 21:27:17,551 __main__ - ERROR -Custom Value Error
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 114, in <module>
+    raise(ValueError("Custom Value Error"))
+ValueError: Custom Value Error
+2020-11-19 21:27:21,436 __main__ - WARNING -HTTPConnectionPool(host='localhost', port=8081): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000001F0F1D10188>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
+2020-11-19 21:27:21,436 __main__ - WARNING -HTTPConnectionPool(host='localhost', port=8081): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000001F0F1D10188>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
+2020-11-20 07:55:19,921 __main__ - WARNING -HTTPConnectionPool(host='localhost', port=8081): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000002BEE370ACC8>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
+2020-11-20 08:03:54,539 __main__ - ERROR -This is something I'm sending just now at 2020-11-20 08:03:54.539072
+2020-11-20 08:04:18,912 __main__ - ERROR -I'm giving the stack track now at 2020-11-20 08:04:18.912111
+NoneType: None
+2020-11-20 08:47:31,168 __main__ - WARNING -HTTPConnectionPool(host='localhost', port=8081): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000002193B371788>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
+2020-11-20 10:26:50,829 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-20 10:26:50,829 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-20 10:26:50,832 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-20 10:26:50,832 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-20 10:26:50,835 __main__ - INFO -Executing in exesting event loop
+2020-11-20 10:26:50,835 __main__ - INFO -Executing in exesting event loop
+2020-11-20 10:36:25,868 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-20 10:36:25,868 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-20 10:36:48,563 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-20 10:36:48,563 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-20 10:37:46,405 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-20 10:37:55,417 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-20 10:38:13,494 __main__ - INFO -Executing in exesting event loop
+2020-11-20 10:39:45,872 __main__ - ERROR -Error at BACnet HTTP Server. Content dump: b'Received improper BACnet response <bacpypes.iocb.IOCB(1) instance at 0x296af218388>'
+2020-11-20 10:39:45,873 __main__ - ERROR -Expecting value: line 1 column 1 (char 0)
+2020-11-20 10:39:45,874 __main__ - ERROR -local variable 'res_json' referenced before assignment
+Traceback (most recent call last):
+  File "<ipython-input-2-8a3bbf64d9ae>", line 55, in main
+    'temperature':res_json["('analogInput', 1)"]['presentValue'],
+UnboundLocalError: local variable 'res_json' referenced before assignment
+2020-11-21 13:23:51,020 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-21 13:23:51,021 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-21 13:23:51,022 __main__ - INFO -Executing in exesting event loop
+2020-11-21 13:23:54,082 __main__ - ERROR -Error at BACnet HTTP Server. Content dump: b'Received improper BACnet response <bacpypes.iocb.IOCB(2) instance at 0x296af2256c8>'
+2020-11-21 13:23:54,083 __main__ - ERROR -Expecting value: line 1 column 1 (char 0)
+2020-11-21 13:23:54,084 __main__ - ERROR -local variable 'res_json' referenced before assignment
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 167, in main
+    'temperature':res_json["('analogInput', 1)"]['presentValue'],
+UnboundLocalError: local variable 'res_json' referenced before assignment
+2020-11-21 13:28:54,075 __main__ - ERROR -Error at BACnet HTTP Server. Content dump: b'Received improper BACnet response <bacpypes.iocb.IOCB(4) instance at 0x296af22b608>'
+2020-11-21 13:28:54,076 __main__ - ERROR -Expecting value: line 1 column 1 (char 0)
+2020-11-21 13:28:54,078 __main__ - ERROR -local variable 'res_json' referenced before assignment
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 167, in main
+    'temperature':res_json["('analogInput', 1)"]['presentValue'],
+UnboundLocalError: local variable 'res_json' referenced before assignment
+2020-11-21 16:51:54,612 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-21 16:51:54,612 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-21 16:51:54,615 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-21 16:51:54,615 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-21 16:51:54,616 __main__ - INFO -Executing in exesting event loop
+2020-11-21 16:51:54,616 __main__ - INFO -Executing in exesting event loop
+2020-11-21 16:51:55,592 __main__ - ERROR -__init__() missing 1 required positional argument: 'provider_id'
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 175, in main
+    pdu = CWOPPDU(**pdu_kwargs)
+TypeError: __init__() missing 1 required positional argument: 'provider_id'
+2020-11-21 16:51:55,592 __main__ - ERROR -__init__() missing 1 required positional argument: 'provider_id'
+Traceback (most recent call last):
+  File "C:\Users\z003vrzk\.spyder-py3\Scripts\weather_station\main.py", line 175, in main
+    pdu = CWOPPDU(**pdu_kwargs)
+TypeError: __init__() missing 1 required positional argument: 'provider_id'
+2020-11-21 16:56:08,362 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-21 16:56:08,362 __main__ - INFO -BACnet HTTP Server is responding
+2020-11-21 16:56:08,364 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-21 16:56:08,364 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-11-21 16:56:08,366 __main__ - INFO -Executing in exesting event loop
+2020-11-21 16:56:08,366 __main__ - INFO -Executing in exesting event loop
+2020-11-22 14:33:53,039 __main__ - ERROR -Error at BACnet HTTP Server. Content dump: b'Received improper BACnet response \nargs : (<bacpypes.apdu.ReadPropertyMultipleRequest(14,40) instance at 0x291d9b51d88>,)\nkwargs : {}\nioState : 4\nioComplete : <threading.Event object at 0x00000291D9B63D48>\nioCallback : []\nioResponse : None'
+2020-11-22 14:33:53,039 __main__ - ERROR -Error at BACnet HTTP Server. Content dump: b'Received improper BACnet response \nargs : (<bacpypes.apdu.ReadPropertyMultipleRequest(14,40) instance at 0x291d9b51d88>,)\nkwargs : {}\nioState : 4\nioComplete : <threading.Event object at 0x00000291D9B63D48>\nioCallback : []\nioResponse : None'
+2020-11-30 20:07:21,496 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 10 seconds.
+2020-11-30 20:07:21,498 __main__ - INFO -Executing in exesting event loop
+2020-11-30 20:07:21,505 __main__ - INFO -Calling main()
+2020-11-30 20:07:31,504 __main__ - INFO -Calling main()
+2020-11-30 20:25:37,725 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 10 seconds.
+2020-11-30 20:25:37,725 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 10 seconds.
+2020-11-30 20:25:37,742 __main__ - INFO -Calling main()
+2020-11-30 20:25:37,742 __main__ - INFO -Calling main()
+2020-11-30 20:25:47,740 __main__ - INFO -Calling main()
+2020-11-30 20:25:47,740 __main__ - INFO -Calling main()
+2020-11-30 20:25:57,740 __main__ - INFO -Calling main()
+2020-11-30 20:25:57,740 __main__ - INFO -Calling main()
+2020-11-30 20:27:31,148 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 10 seconds.
+2020-11-30 20:27:31,148 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 10 seconds.
+2020-11-30 20:27:31,148 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 10 seconds.
+2020-11-30 20:27:31,168 __main__ - INFO -Calling main()
+2020-11-30 20:27:31,168 __main__ - INFO -Calling main()
+2020-11-30 20:27:31,168 __main__ - INFO -Calling main()
+2020-11-30 20:27:41,182 __main__ - INFO -Calling main()
+2020-11-30 20:27:41,182 __main__ - INFO -Calling main()
+2020-11-30 20:27:41,182 __main__ - INFO -Calling main()
+2020-12-01 20:17:18,500 __main__ - INFO -BACnet HTTP Server is responding
+2020-12-01 20:17:18,501 __main__ - INFO -Starting main loop. The CWOP Client loop will run continuously every 300 seconds.
+2020-12-01 20:17:18,501 __main__ - INFO -Starting new Async Event Loop
+2020-12-01 20:17:18,704 __main__ - INFO -PDU Sent
+2020-12-01 20:22:18,785 __main__ - INFO -PDU Sent
+2020-12-01 20:27:18,867 __main__ - INFO -PDU Sent
+2020-12-01 20:32:19,744 __main__ - INFO -PDU Sent
+2020-12-01 20:37:19,160 __main__ - INFO -PDU Sent
+2020-12-01 20:42:19,132 __main__ - INFO -PDU Sent
+2020-12-01 20:47:19,225 __main__ - INFO -PDU Sent
