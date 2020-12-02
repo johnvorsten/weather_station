@@ -135,6 +135,12 @@ if __name__ == '__main__':
 
 #%%
 
+"""This method also works. First we define a callback (Not a coroutine) and
+schedule the callback to be placed on the loop.
+Then we start the loop
+In this case IDK if the loop will exit - it will probably just run forever"""
+
+
 def hello_world():
     """A callback to print 'Hello World' and stop the event loop"""
     print('Hello World')
