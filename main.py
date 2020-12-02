@@ -224,19 +224,25 @@ if __name__ == '__main__':
     logger.info("Starting main loop. The CWOP Client loop will run " +
                 "continuously every {} seconds.".format(call_period))
     recurring_timer = AsyncRecurringTimer(call_period, main, recurring=True)
-    if asyncio.get_event_loop() is None:
-        # There is no running event loop
-        logger.info("Starting new Async Event Loop")
-        asyncio.run(recurring_timer.start())
 
-    else:
+    try:
         # There is an existing event loop
         # AKA working in ipython
-        logger.info("Executing in exesting event loop")
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            client_coroutine = recurring_timer.start()
-            client_task = asyncio.create_task(client_coroutine)
+        loop = asyncio.get_running_loop()
+        client_coroutine = recurring_timer.start()
+        client_task = asyncio.create_task(client_coroutine)
 
-        else:
-            pass
+    except RuntimeError:
+        # There is no running event loop
+        logger.info("Starting new Async Event Loop")
+        loop = asyncio.get_event_loop()
+        # Now.. I need to set the coroutine to be executed in the loop
+        # once started
+        client_coroutine = recurring_timer.start()
+        client_task = loop.create_task(client_coroutine)
+
+    try:
+        loop.run_forever()
+    finally:
+        recurring_timer.cancel()
+        loop.close()
